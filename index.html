@@ -106,7 +106,7 @@
             font-size: 24dvh;
             font-weight: 700;
             color: rgba(255, 255, 255, 0.15);
-            z-index: 3;
+            z-index: 1;
             pointer-events: none;
             transition: color 0.35s ease, text-shadow 0.35s ease;
             display: none;
@@ -535,7 +535,7 @@
         #bestScoreDisplay {
             top: calc(50% - 11vh);
             top: calc(50% - 11dvh);
-            z-index: 3;
+            z-index: 1;
             color: rgba(255, 255, 255, 0.15);
             display: none;
         }
@@ -720,6 +720,7 @@
         const playfieldTint = document.getElementById('playfieldTint');
         const outsideGlow = document.getElementById('outsideGlow');
         const edgeGlow = document.getElementById('edgeGlow');
+        gameArea.insertBefore(bestScoreDisplay, edgeGlow);
         const edgeGlowTop = document.querySelector('.edgeGlowTop');
         const edgeGlowRight = document.querySelector('.edgeGlowRight');
         const edgeGlowBottom = document.querySelector('.edgeGlowBottom');
