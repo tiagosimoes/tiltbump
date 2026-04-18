@@ -1144,6 +1144,13 @@
         let doubleHitCalloutTotal = 0;
         let dominoCalloutTotal = 0;
         let doubleDominoCalloutTotal = 0;
+        let comboCalloutTotal = 0;
+        let queuedBallCallout = null;
+        let lastComboAt = -Infinity;
+        let lastComboSourceAt = {
+            domino: -Infinity,
+            wall: -Infinity
+        };
 
         function createTrailNodes() {
             for (let i = 0; i < trailLength; i++) {
@@ -1439,7 +1446,8 @@
                         wallKnocks: 0,
                         doubleHits: 0,
                         dominos: 0,
-                        doubleDominos: 0
+                        doubleDominos: 0,
+                combos: 0
                     };
                 }
 
@@ -1448,14 +1456,16 @@
                     wallKnocks: Number.isFinite(parsed?.wallKnocks) ? parsed.wallKnocks : 0,
                     doubleHits: Number.isFinite(parsed?.doubleHits) ? parsed.doubleHits : 0,
                     dominos: Number.isFinite(parsed?.dominos) ? parsed.dominos : 0,
-                    doubleDominos: Number.isFinite(parsed?.doubleDominos) ? parsed.doubleDominos : 0
+                    doubleDominos: Number.isFinite(parsed?.doubleDominos) ? parsed.doubleDominos : 0,
+            combos: Number.isFinite(parsed?.combos) ? parsed.combos : 0
                 };
             } catch {
                 return {
                     wallKnocks: 0,
                     doubleHits: 0,
                     dominos: 0,
-                    doubleDominos: 0
+                    doubleDominos: 0,
+                combos: 0
                 };
             }
         }
@@ -1547,6 +1557,10 @@
             }
             if (doubleDominoCalloutTotal > achievementBestRecords.doubleDominos) {
                 achievementBestRecords.doubleDominos = doubleDominoCalloutTotal;
+                changed = true;
+            }
+            if (comboCalloutTotal > achievementBestRecords.combos) {
+                achievementBestRecords.combos = comboCalloutTotal;
                 changed = true;
             }
 
@@ -2541,6 +2555,35 @@
             ballCallout.style.transform = 'translate(-9999px, -9999px)';
         }
 
+        function queueBallCallout(text, now, durationMs = ballCalloutDurationMs, gapMs = 70) {
+            const startAt = activeBallCallout
+                ? Math.max(now, activeBallCallout.startedAt + activeBallCallout.durationMs + gapMs)
+                : now;
+            queuedBallCallout = {
+                text,
+                startAt,
+                durationMs
+            };
+        }
+
+        function maybeRegisterCombo(source, now) {
+            const otherSource = source === 'domino' ? 'wall' : 'domino';
+            const comboWindowMs = 1050;
+            if (now - lastComboSourceAt[otherSource] > comboWindowMs) {
+                lastComboSourceAt[source] = now;
+                return;
+            }
+            if (now - lastComboAt < 260) {
+                lastComboSourceAt[source] = now;
+                return;
+            }
+
+            lastComboAt = now;
+            lastComboSourceAt[source] = now;
+            comboCalloutTotal++;
+            queueBallCallout('Combo!', now, 760);
+        }
+
         function showBallCallout(text, now, durationMs = ballCalloutDurationMs) {
             ballCallout.textContent = text;
             const calloutScale = Math.max(0.68, getPlayfieldScale(now));
@@ -2564,11 +2607,23 @@
         }
 
         function updateBallCallout(now = performance.now()) {
-            if (!activeBallCallout) return;
+            if (!activeBallCallout) {
+                if (queuedBallCallout && now >= queuedBallCallout.startAt) {
+                    const nextCallout = queuedBallCallout;
+                    queuedBallCallout = null;
+                    showBallCallout(nextCallout.text, now, nextCallout.durationMs);
+                }
+                return;
+            }
 
             const elapsed = now - activeBallCallout.startedAt;
             if (elapsed >= activeBallCallout.durationMs) {
                 clearBallCallout();
+                if (queuedBallCallout && now >= queuedBallCallout.startAt) {
+                    const nextCallout = queuedBallCallout;
+                    queuedBallCallout = null;
+                    showBallCallout(nextCallout.text, now, nextCallout.durationMs);
+                }
                 return;
             }
 
@@ -2643,10 +2698,11 @@
 
             lastDominoCalloutAt = now;
             showBallCallout(
-                dominoCalloutCount === 1 ? 'Domino!' : `${getMultiplierWord(dominoCalloutCount)} Domino!`,
+                dominoCalloutCount === 1 ? 'domino!' : `${getMultiplierWord(dominoCalloutCount)} domino!`,
                 now,
                 860
             );
+            maybeRegisterCombo('domino', now);
         }
 
         function emitParticles(originX, originY, strength = 1) {
@@ -2679,6 +2735,13 @@
                     element
                 });
             }
+        }
+
+        function playNewBestCelebrationSound() {
+            if (!audioCtx || isMuted) return;
+            playSound(520, 0.028, 0.18, 'triangle');
+            setTimeout(() => playSound(660, 0.03, 0.2, 'triangle'), 90);
+            setTimeout(() => playSound(840, 0.034, 0.28, 'triangle'), 180);
         }
 
         function updateParticles() {
@@ -3338,6 +3401,9 @@
             restartText.style.display = 'block';
             updateLevelIndicatorState();
             updateAchievementSummaryState();
+            if (madeNewBest) {
+                playNewBestCelebrationSound();
+            }
             syncDesktopStartUiVisibility();
             armStartInput(250);
         }
@@ -3529,6 +3595,8 @@
             updateViewportBounds();
 
             resetInputState();
+            resetRunAchievementTotals();
+            updateAchievementSummaryState();
             bestScoreBeforeRun = bestScore;
             currentRunStartLevel = previewLevel;
             currentRunIsPreview = previewLevel > 1;
