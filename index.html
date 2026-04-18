@@ -2956,19 +2956,21 @@
             if (shouldUseKeyboardPrompt()) {
                 return isFirstLaunch ? 'click to start' : 'click to restart';
             }
-            
-            let text = isFirstLaunch
-                ? 'hold phone still and<br>click to start'
-                : 'tap anywhere to restart';
-                
+
+            const shouldShowHoldStill = isFirstLaunch || (isShowingGameOver && level < 3);
+            let text = shouldShowHoldStill
+                ? `hold phone still and<br>tap anywhere to ${isFirstLaunch ? 'start' : 'restart'}`
+                : `tap anywhere to ${isFirstLaunch ? 'start' : 'restart'}`;
+
             if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function' && !motionPermissionGranted) {
-                text += '<br><span style="font-size: 0.85em; opacity: 0.75;">and click Allow if prompted</span>';
+                text += '<br><span style="font-size: 0.85em; opacity: 0.75;">and tap Allow if prompted</span>';
             }
-            
+
             return text;
         }
 
-        function getIntroCopy() {
+
+function getIntroCopy() {
             return shouldUseKeyboardPrompt()
                 ? "slowly move mouse to bump all blocks<br>but don't fall off the board"
                 : "lightly tilt phone to bump all blocks<br>but don't fall off the board";
