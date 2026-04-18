@@ -522,6 +522,34 @@
             font-weight: inherit;
         }
 
+        #achievementSummary {
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%) scale(var(--overlay-text-scale, 1));
+            transform-origin: center top;
+            width: calc(100vw - 32px);
+            max-width: 560px;
+            padding: 0 calc(16px + var(--safe-right)) 0 calc(16px + var(--safe-left));
+            box-sizing: border-box;
+            display: none;
+            text-align: center;
+            font-size: 20px;
+            color: var(--hud-color);
+            line-height: 1.35;
+            font-weight: inherit;
+            pointer-events: none;
+            z-index: 1000;
+            white-space: normal;
+        }
+
+        #achievementSummary .achievement-line {
+            margin-top: 4px;
+        }
+
+        #achievementSummary .achievement-line.record {
+            color: rgba(241, 196, 15, 0.92);
+        }
+
         #introText {
             top: calc(30% + var(--safe-top));
             z-index: 1000;
@@ -751,6 +779,7 @@
     <div id="safeAreaProbe" aria-hidden="true"></div>
     <div id="gameArea">
         <div id="levelIndicator">1</div>
+        <div id="achievementSummary" aria-live="polite"></div>
         <div id="playfieldTint" aria-hidden="true"></div>
         <div id="outsideGlow" aria-hidden="true"></div>
         <div id="edgeGlow" aria-hidden="true">
@@ -813,6 +842,7 @@
         const ball = document.getElementById('ball');
         const dominoContainer = document.getElementById('dominoContainer');
         const levelIndicator = document.getElementById('levelIndicator');
+        const achievementSummary = document.getElementById('achievementSummary');
         const restartText = document.getElementById('restartText');
         const introText = document.getElementById('introText');
         const bestScoreDisplay = document.getElementById('bestScoreDisplay');
@@ -1068,6 +1098,13 @@
         let isShowingGameOver = false;
         let ballScale = 1;
         let bestScore = readBestScore();
+        let achievementBestRecords = loadAchievementBestRecords();
+        let achievementRecordHighlights = {
+            wallKnocks: false,
+            doubleHits: false,
+            dominos: false,
+            doubleDominos: false
+        };
         let isMuted = readMutePreference();
         let bestScoreBeforeRun = bestScore;
         let previewLevel = readPreviewLevel();
@@ -1103,6 +1140,10 @@
         let dominoCalloutCount = 0;
         let lastDominoCalloutAt = -Infinity;
         let desktopQrVisible = false;
+        let wallKnockCalloutTotal = 0;
+        let doubleHitCalloutTotal = 0;
+        let dominoCalloutTotal = 0;
+        let doubleDominoCalloutTotal = 0;
 
         function createTrailNodes() {
             for (let i = 0; i < trailLength; i++) {
@@ -1165,9 +1206,22 @@
             bestScoreDisplay.style.top = `${centerY + ((bestBaseTop - centerY) * overlayScale)}px`;
             bestScoreDisplay.style.setProperty('--overlay-text-scale', overlayScale.toFixed(3));
 
+            achievementSummary.style.left = `${centerX}px`;
+            achievementSummary.style.setProperty('--overlay-text-scale', overlayScale.toFixed(3));
+            if (isShowingGameOver && achievementSummary.style.display !== 'none') {
+                const achievementBaseTop = safeInsets.top + (viewportHeight * (viewportHeight <= 500 ? 0.60 : 0.61));
+                achievementSummary.style.top = `${centerY + ((achievementBaseTop - centerY) * overlayScale)}px`;
+            }
+
             restartText.style.left = `${centerX}px`;
-            restartText.style.top = `${centerY + ((restartBaseTop - centerY) * overlayScale)}px`;
             restartText.style.setProperty('--overlay-text-scale', overlayScale.toFixed(3));
+            if (isShowingGameOver && achievementSummary.style.display !== 'none') {
+                const achievementRect = achievementSummary.getBoundingClientRect();
+                const restartTop = achievementRect.bottom + (viewportHeight <= 500 ? 10 : 14);
+                restartText.style.top = `${restartTop}px`;
+            } else {
+                restartText.style.top = `${centerY + ((restartBaseTop - centerY) * overlayScale)}px`;
+            }
 
             mobileVersionLinkWrap.style.left = `${centerX}px`;
             mobileVersionLinkWrap.style.top = `${centerY + ((linkBaseTop - centerY) * overlayScale)}px`;
@@ -1374,6 +1428,130 @@
                 localStorage.setItem('theEdgeBestScore', score);
             } catch {
                 // Storage can be unavailable in some iOS private / standalone contexts.
+            }
+        }
+
+        function loadAchievementBestRecords() {
+            try {
+                const raw = localStorage.getItem('tiltbump-achievement-best-records');
+                if (!raw) {
+                    return {
+                        wallKnocks: 0,
+                        doubleHits: 0,
+                        dominos: 0,
+                        doubleDominos: 0
+                    };
+                }
+
+                const parsed = JSON.parse(raw);
+                return {
+                    wallKnocks: Number.isFinite(parsed?.wallKnocks) ? parsed.wallKnocks : 0,
+                    doubleHits: Number.isFinite(parsed?.doubleHits) ? parsed.doubleHits : 0,
+                    dominos: Number.isFinite(parsed?.dominos) ? parsed.dominos : 0,
+                    doubleDominos: Number.isFinite(parsed?.doubleDominos) ? parsed.doubleDominos : 0
+                };
+            } catch {
+                return {
+                    wallKnocks: 0,
+                    doubleHits: 0,
+                    dominos: 0,
+                    doubleDominos: 0
+                };
+            }
+        }
+
+        function persistAchievementBestRecords(records) {
+            try {
+                localStorage.setItem('tiltbump-achievement-best-records', JSON.stringify(records));
+            } catch {
+                // Ignore persistence failures.
+            }
+        }
+
+        function resetRunAchievementTotals() {
+            wallKnockCalloutTotal = 0;
+            doubleHitCalloutTotal = 0;
+            dominoCalloutTotal = 0;
+            doubleDominoCalloutTotal = 0;
+            achievementRecordHighlights = {
+                wallKnocks: false,
+                doubleHits: false,
+                dominos: false,
+                doubleDominos: false
+            };
+        }
+
+        function pluralizeAchievementLabel(count, singular, plural = `${singular}s`) {
+            return count === 1 ? singular : plural;
+        }
+
+        function getAchievementSummaryLines() {
+            return [
+                {
+                    key: 'wallKnocks',
+                    count: wallKnockCalloutTotal,
+                    label: `${wallKnockCalloutTotal}x ${pluralizeAchievementLabel(wallKnockCalloutTotal, 'wall knock', 'wall knocks')}!`
+                },
+                {
+                    key: 'doubleHits',
+                    count: doubleHitCalloutTotal,
+                    label: `${doubleHitCalloutTotal}x ${pluralizeAchievementLabel(doubleHitCalloutTotal, 'double hit', 'double hits')}!`
+                },
+                {
+                    key: 'dominos',
+                    count: dominoCalloutTotal,
+                    label: `${dominoCalloutTotal}x ${pluralizeAchievementLabel(dominoCalloutTotal, 'domino', 'dominos')}!`
+                },
+                {
+                    key: 'doubleDominos',
+                    count: doubleDominoCalloutTotal,
+                    label: `${doubleDominoCalloutTotal}x ${pluralizeAchievementLabel(doubleDominoCalloutTotal, 'double domino', 'double dominos')}!`
+                }
+            ].filter(line => line.count > 0);
+        }
+
+        function captureAchievementRecordHighlights() {
+            achievementRecordHighlights = {
+                wallKnocks: wallKnockCalloutTotal > (achievementBestRecords.wallKnocks || 0),
+                doubleHits: doubleHitCalloutTotal > (achievementBestRecords.doubleHits || 0),
+                dominos: dominoCalloutTotal > (achievementBestRecords.dominos || 0),
+                doubleDominos: doubleDominoCalloutTotal > (achievementBestRecords.doubleDominos || 0)
+            };
+        }
+
+        function updateAchievementSummaryState() {
+            if (!achievementSummary) return;
+
+            const lines = isShowingGameOver ? getAchievementSummaryLines() : [];
+            achievementSummary.innerHTML = lines.map(({ key, label }) => {
+                const isRecord = Boolean(achievementRecordHighlights[key]);
+                return `<div class="achievement-line${isRecord ? ' record' : ''}">${label}</div>`;
+            }).join('');
+            achievementSummary.style.display = lines.length ? 'block' : 'none';
+        }
+
+        function updateAchievementBestRecords() {
+            let changed = false;
+
+            if (wallKnockCalloutTotal > achievementBestRecords.wallKnocks) {
+                achievementBestRecords.wallKnocks = wallKnockCalloutTotal;
+                changed = true;
+            }
+            if (doubleHitCalloutTotal > achievementBestRecords.doubleHits) {
+                achievementBestRecords.doubleHits = doubleHitCalloutTotal;
+                changed = true;
+            }
+            if (dominoCalloutTotal > achievementBestRecords.dominos) {
+                achievementBestRecords.dominos = dominoCalloutTotal;
+                changed = true;
+            }
+            if (doubleDominoCalloutTotal > achievementBestRecords.doubleDominos) {
+                achievementBestRecords.doubleDominos = doubleDominoCalloutTotal;
+                changed = true;
+            }
+
+            if (changed) {
+                persistAchievementBestRecords(achievementBestRecords);
             }
         }
 
@@ -1998,6 +2176,7 @@
             levelIndicator.classList.toggle('milestone', isMilestoneLevel(displayLevel));
             applyThemeForLevel(displayLevel);
             updateBestScoreDisplayState();
+            updateAchievementSummaryState();
             updateOverlayTextLayout();
         }
 
@@ -2408,6 +2587,9 @@
             domino.lastHitAt = now;
             domino.hitCount = (domino.hitCount || 0) + 1;
             if (domino.hitCount >= 2) {
+                if (domino.hitCount === 2) {
+                    doubleHitCalloutTotal++;
+                }
                 showBallCallout(`${getMultiplierWord(domino.hitCount)} hit!`, now, 820);
             }
         }
@@ -2436,10 +2618,11 @@
             if ((domino.lastWallCalloutAt ?? -Infinity) + wallCalloutCooldownMs > now) return;
 
             const strength = getWallKnockStrength(domino, hitRect, wallAxis);
-            if (strength < 0.12) return;
+            if (strength < 0.04) return;
 
             domino.lastWallCalloutAt = now;
             shrinkPausedUntil = Math.max(shrinkPausedUntil, now + blockKnockShrinkPauseMs);
+            wallKnockCalloutTotal++;
             showBallCallout('Wall knock!', now, 760);
             expandPlayfieldOnWallKnock(now, strength);
         }
@@ -2451,6 +2634,11 @@
                 dominoCalloutCount += addedCount;
             } else {
                 dominoCalloutCount = addedCount;
+            }
+
+            dominoCalloutTotal += addedCount;
+            if (dominoCalloutCount >= 2) {
+                doubleDominoCalloutTotal++;
             }
 
             lastDominoCalloutAt = now;
@@ -3128,6 +3316,10 @@
                 persistBestScore(bestScore);
             }
 
+            captureAchievementRecordHighlights();
+            updateAchievementSummaryState();
+            updateAchievementBestRecords();
+
             dominoes.forEach(domino => {
                 domino.element.style.opacity = '';
                 domino.element.classList.add('game-over-fade');
@@ -3145,6 +3337,7 @@
             restartText.innerHTML = getRestartCopy(false);
             restartText.style.display = 'block';
             updateLevelIndicatorState();
+            updateAchievementSummaryState();
             syncDesktopStartUiVisibility();
             armStartInput(250);
         }
@@ -3350,6 +3543,8 @@
             resetTrail();
             clearParticles();
             clearBallCallout();
+            resetRunAchievementTotals();
+            updateAchievementSummaryState();
             setShrinkWarningTone(false);
             transitionFlashOpacity = 0;
             transitionFlash.style.opacity = '0';
@@ -3399,6 +3594,7 @@
         restartText.style.display = 'block';
         restartText.innerHTML = getRestartCopy(true);
         updateLevelIndicatorState();
+        updateAchievementSummaryState();
         applyPauseState();
         applyMuteState();
         syncDesktopStartUiVisibility();
