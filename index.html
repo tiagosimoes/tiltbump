@@ -1,0 +1,3288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="theme-color" content="#000000">
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#000000">
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#000000">
+    <title>Gyro</title>
+    <style>
+        :root {
+            --safe-top: env(safe-area-inset-top, 0px);
+            --safe-right: env(safe-area-inset-right, 0px);
+            --safe-bottom: env(safe-area-inset-bottom, 0px);
+            --safe-left: env(safe-area-inset-left, 0px);
+            --bg-top: #324b61;
+            --bg-bottom: #0c1825;
+            --bg-accent: rgba(123, 193, 255, 0.2);
+            --bg-accent-soft: rgba(74, 113, 161, 0.18);
+            --hud-color: rgba(208, 220, 236, 0.72);
+            --hud-solid: rgb(176, 185, 198);
+            --level-shadow: rgba(123, 193, 255, 0.16);
+            --ball-highlight: #fff2b4;
+            --ball-mid: #f4c542;
+            --ball-dark: #cc8c05;
+            --ball-glow: rgba(244, 197, 66, 0.34);
+            --trail-color: rgba(244, 197, 66, 0.5);
+            --block-light: #f7d754;
+            --block-mid: #f1c40f;
+            --block-dark: #c79607;
+            --block-sheen: rgba(255, 255, 255, 0.18);
+            --block-shadow: rgba(0, 0, 0, 0.28);
+            --knocked-light: #566a7f;
+            --knocked-mid: #34495e;
+            --knocked-dark: #233240;
+            --knocked-sheen: rgba(255, 255, 255, 0.08);
+            --edge-color: rgba(244, 197, 66, 0.34);
+            --flash-color: rgba(123, 193, 255, 0.22);
+        }
+
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100vw;
+            height: 100vh;
+            height: 100dvh;
+            overflow: visible;
+            background-color: #000;
+            touch-action: none;
+            overscroll-behavior: none;
+            transition: background-color 0.9s ease;
+        }
+
+        html {
+            background: #000;
+            color-scheme: dark;
+        }
+
+        body {
+            color: white;
+            font-family: system-ui, -apple-system, sans-serif;
+            font-weight: 200;
+            position: fixed;
+            inset: 0;
+            width: 100vw;
+            height: 100vh;
+            height: 100dvh;
+        }
+
+        #gameArea {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            height: 100dvh;
+            overflow: hidden;
+            z-index: 0;
+            background: transparent;
+        }
+
+        #safeAreaProbe {
+            position: fixed;
+            inset: 0;
+            width: 0;
+            height: 0;
+            visibility: hidden;
+            pointer-events: none;
+            padding-top: env(safe-area-inset-top, 0px);
+            padding-right: env(safe-area-inset-right, 0px);
+            padding-bottom: env(safe-area-inset-bottom, 0px);
+            padding-left: env(safe-area-inset-left, 0px);
+            box-sizing: border-box;
+        }
+
+        #levelIndicator {
+            position: absolute;
+            top: 52%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(var(--level-indicator-scale, 1));
+            transform-origin: center center;
+            font-size: 24vh;
+            font-size: 24dvh;
+            font-weight: 700;
+            color: rgba(255, 255, 255, 0.15);
+            z-index: 3;
+            pointer-events: none;
+            transition: color 0.35s ease, text-shadow 0.35s ease;
+            display: none;
+        }
+
+        #levelIndicator.new-best {
+            color: rgba(241, 196, 15, 0.15);
+        }
+
+        #levelIndicator.milestone {
+            text-shadow: 0 0 36px var(--level-shadow);
+        }
+
+        #levelIndicator.game-over {
+            color: var(--hud-solid);
+            z-index: 1201;
+            opacity: 1;
+        }
+
+        #levelIndicator.game-over.new-best {
+            color: rgb(241, 196, 15);
+        }
+
+        #levelIndicator.pop {
+            animation:
+                levelPop 0.6s cubic-bezier(0.2, 0.8, 0.2, 1),
+                levelLighten 0.6s ease-out;
+        }
+
+        @keyframes levelPop {
+            0% {
+                transform: translate(-50%, -50%) scale(calc(var(--level-indicator-scale, 1) * 0.92));
+                opacity: 0.8;
+            }
+            45% {
+                transform: translate(-50%, -50%) scale(calc(var(--level-indicator-scale, 1) * 1.08));
+            }
+            100% {
+                transform: translate(-50%, -50%) scale(var(--level-indicator-scale, 1));
+                opacity: 1;
+            }
+        }
+
+        @keyframes levelLighten {
+            0% {
+                filter: brightness(1);
+            }
+            30% {
+                filter: brightness(2.15);
+            }
+            100% {
+                filter: brightness(1);
+            }
+        }
+
+        #edgeGlow {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            z-index: 2;
+            overflow: hidden;
+            border-radius: 0;
+        }
+
+        #playfieldBorder {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 0;
+            height: 0;
+            box-sizing: border-box;
+            border: 4px solid rgba(241, 196, 15, 0.82);
+            border-radius: 0;
+            box-shadow:
+                0 0 0 1px rgba(255, 255, 255, 0.08) inset,
+                0 0 28px rgba(123, 193, 255, 0.12);
+            opacity: 0;
+            pointer-events: none;
+            z-index: 2;
+            transition: opacity 0.12s linear, border-color 0.12s linear, box-shadow 0.12s linear, border-width 0.12s linear;
+        }
+
+        #edgeThreatOverlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 0;
+            height: 0;
+            pointer-events: none;
+            z-index: 3;
+            overflow: visible;
+            border-radius: 0;
+        }
+
+        .edgeThreatCutout {
+            position: absolute;
+            opacity: 0;
+            transition: opacity 0.08s linear;
+            will-change: opacity;
+        }
+
+        .edgeThreatTop,
+        .edgeThreatBottom {
+            left: 0;
+            width: 100%;
+            height: 40px;
+        }
+
+        .edgeThreatLeft,
+        .edgeThreatRight {
+            top: 0;
+            width: 40px;
+            height: 100%;
+        }
+
+        .edgeThreatTop {
+            top: -28px;
+            background: linear-gradient(180deg, rgba(0, 0, 0, 1) 0%, rgba(0, 0, 0, 0.98) 32%, rgba(0, 0, 0, 0.72) 58%, rgba(0, 0, 0, 0.2) 78%, rgba(0, 0, 0, 0) 100%);
+        }
+
+        .edgeThreatBottom {
+            bottom: -28px;
+            background: linear-gradient(0deg, rgba(0, 0, 0, 1) 0%, rgba(0, 0, 0, 0.98) 32%, rgba(0, 0, 0, 0.72) 58%, rgba(0, 0, 0, 0.2) 78%, rgba(0, 0, 0, 0) 100%);
+        }
+
+        .edgeThreatLeft {
+            left: -28px;
+            background: linear-gradient(90deg, rgba(0, 0, 0, 1) 0%, rgba(0, 0, 0, 0.98) 32%, rgba(0, 0, 0, 0.72) 58%, rgba(0, 0, 0, 0.2) 78%, rgba(0, 0, 0, 0) 100%);
+        }
+
+        .edgeThreatRight {
+            right: -28px;
+            background: linear-gradient(270deg, rgba(0, 0, 0, 1) 0%, rgba(0, 0, 0, 0.98) 32%, rgba(0, 0, 0, 0.72) 58%, rgba(0, 0, 0, 0.2) 78%, rgba(0, 0, 0, 0) 100%);
+        }
+
+        #playfieldTint {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 0;
+            height: 0;
+            pointer-events: none;
+            z-index: 0;
+            opacity: 0;
+            border-radius: 0;
+            background: var(--bg-top);
+            box-shadow:
+                0 0 0 1px rgba(255, 255, 255, 0.04) inset;
+            will-change: left, top, width, height, border-radius, opacity;
+        }
+
+        #outsideGlow {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 0;
+            height: 0;
+            pointer-events: none;
+            z-index: 1;
+            opacity: 0;
+            border-radius: 0;
+            background: transparent;
+            will-change: left, top, width, height, border-radius, opacity, box-shadow;
+        }
+
+        .edgeGlowSide {
+            position: absolute;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.12s linear;
+        }
+
+        .edgeGlowTop,
+        .edgeGlowBottom {
+            left: 0;
+            width: 100%;
+            height: 20vh;
+            height: 20dvh;
+        }
+
+        .edgeGlowTop {
+            top: 0;
+            background: linear-gradient(180deg, var(--edge-color) 0%, transparent 100%);
+        }
+
+        .edgeGlowBottom {
+            bottom: 0;
+            background: linear-gradient(0deg, var(--edge-color) 0%, transparent 100%);
+        }
+
+        .edgeGlowLeft,
+        .edgeGlowRight {
+            top: 0;
+            width: 20vw;
+            height: 100%;
+        }
+
+        .edgeGlowLeft {
+            left: 0;
+            background: linear-gradient(90deg, var(--edge-color) 0%, transparent 100%);
+        }
+
+        .edgeGlowRight {
+            right: 0;
+            background: linear-gradient(270deg, var(--edge-color) 0%, transparent 100%);
+        }
+
+        #trailContainer,
+        #particleContainer,
+        #transitionFlash {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+        }
+
+        #trailContainer {
+            z-index: 3;
+        }
+
+        .trailGhost {
+            position: absolute;
+            width: 50px;
+            height: 50px;
+            margin-left: -25px;
+            margin-top: -25px;
+            border-radius: 50%;
+            background: radial-gradient(circle at 35% 30%, rgba(255,255,255,0.42) 0%, var(--trail-color) 58%, transparent 100%);
+            filter: blur(2px);
+            opacity: 0;
+            transform: translate(-9999px, -9999px) scale(0.7);
+            will-change: transform, opacity;
+        }
+
+        #particleContainer {
+            z-index: 6;
+        }
+
+        .impactParticle {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            margin-left: -5px;
+            margin-top: -5px;
+            border-radius: 999px;
+            background: var(--trail-color);
+            opacity: 0;
+            will-change: transform, opacity;
+        }
+
+        #transitionFlash {
+            z-index: 7;
+            opacity: 0;
+            background:
+                radial-gradient(circle at 50% 50%, var(--flash-color) 0%, transparent 56%);
+            will-change: opacity;
+        }
+
+        #ballCallout {
+            position: absolute;
+            top: 0;
+            left: 0;
+            opacity: 0;
+            pointer-events: none;
+            z-index: 8;
+            white-space: nowrap;
+            color: rgba(255, 247, 225, 0.96);
+            font-size: 18px;
+            letter-spacing: 0.03em;
+            font-weight: 400;
+            text-shadow:
+                0 0 4px var(--bg-bottom),
+                0 0 12px var(--bg-bottom);
+            transform: translate(-9999px, -9999px);
+            transform-origin: left center;
+            will-change: transform, opacity;
+        }
+
+        #mouseOriginCrosshair {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 20px;
+            height: 20px;
+            margin: -10px 0 0 -10px;
+            opacity: 0;
+            pointer-events: none;
+            z-index: 6;
+            transform: translate(-9999px, -9999px);
+        }
+
+        #mouseOriginLine {
+            position: absolute;
+            top: 0;
+            left: 0;
+            height: 1px;
+            width: 0;
+            opacity: 0;
+            pointer-events: none;
+            z-index: 6;
+            background: rgba(255, 190, 92, 0.58);
+            transform-origin: 0 50%;
+            transform: translate(-9999px, -9999px);
+        }
+
+        #mouseOriginLine::after {
+            content: '';
+            position: absolute;
+            right: 0;
+            top: 50%;
+            width: 0;
+            height: 0;
+            border-top: 4px solid transparent;
+            border-bottom: 4px solid transparent;
+            border-left: 8px solid rgba(255, 218, 136, 0.9);
+            transform: translateY(-50%);
+        }
+
+        #mouseOriginCrosshair::before,
+        #mouseOriginCrosshair::after {
+            content: '';
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            background: rgba(232, 240, 255, 0.52);
+            transform: translate(-50%, -50%);
+        }
+
+        #mouseOriginCrosshair::before {
+            width: 20px;
+            height: 1px;
+        }
+
+        #mouseOriginCrosshair::after {
+            width: 1px;
+            height: 20px;
+        }
+
+        #dominoContainer {
+            position: absolute;
+            inset: 0;
+        }
+
+        #ball {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 50px;
+            height: 50px;
+            background: radial-gradient(circle at 35% 30%, var(--ball-highlight) 0%, var(--ball-mid) 58%, var(--ball-dark) 100%);
+            border-radius: 50%;
+            box-shadow:
+                0 0 28px var(--ball-glow),
+                inset -10px -10px 20px rgba(0,0,0,0.28),
+                inset 5px 5px 10px rgba(255,255,255,0.24),
+                5px 5px 15px rgba(0,0,0,0.36);
+            display: none;
+            z-index: 5;
+            transform-origin: center;
+            will-change: transform;
+        }
+
+        .domino {
+            position: absolute;
+            border-radius: 4px;
+            background: transparent;
+            filter: drop-shadow(3px 5px 8px var(--block-shadow));
+            transition: opacity 0.3s ease, filter 0.15s ease;
+            z-index: 4;
+            transform-origin: center;
+            will-change: transform;
+        }
+
+        .domino.game-over-fade {
+            opacity: 0;
+            transition: opacity 0.55s ease, filter 0.15s ease;
+        }
+
+        .domino::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: 4px;
+            background: linear-gradient(145deg, var(--block-light) 0%, var(--block-mid) 58%, var(--block-dark) 100%);
+            box-shadow: inset -4px -4px 8px rgba(0,0,0,0.25),
+                        inset 2px 2px 4px var(--block-sheen);
+            transition: background 0.1s, box-shadow 0.1s;
+        }
+
+        .knocked {
+            filter: drop-shadow(2px 3px 5px rgba(0,0,0,0.18));
+        }
+
+        .knocked::before {
+            background: linear-gradient(145deg, var(--knocked-light) 0%, var(--knocked-mid) 58%, var(--knocked-dark) 100%);
+            box-shadow: inset -4px -4px 8px rgba(0,0,0,0.25),
+                        inset 2px 2px 4px var(--knocked-sheen);
+        }
+
+        #introText, #bestScoreDisplay, #restartText {
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%) scale(var(--overlay-text-scale, 1));
+            transform-origin: center top;
+            width: calc(100vw - 32px);
+            max-width: 560px;
+            padding: 0 calc(16px + var(--safe-right)) 0 calc(16px + var(--safe-left));
+            box-sizing: border-box;
+            font-size: 20px;
+            color: var(--hud-color);
+            text-align: center;
+            pointer-events: none;
+            line-height: 1.4;
+            font-weight: inherit;
+        }
+
+        #introText {
+            top: calc(30% + var(--safe-top));
+            z-index: 1000;
+            display: none;
+        }
+
+        #introText.game-over {
+            color: rgba(208, 220, 236, 0.42);
+        }
+
+        #bestScoreDisplay {
+            top: calc(50% - 11vh);
+            top: calc(50% - 11dvh);
+            z-index: 3;
+            color: rgba(255, 255, 255, 0.15);
+            display: none;
+        }
+
+        #bestScoreDisplay.new-high-score {
+            color: rgba(241, 196, 15, 0.15);
+        }
+
+        #bestScoreDisplay.game-over {
+            z-index: 1000;
+            color: var(--hud-solid);
+        }
+
+        #bestScoreDisplay.game-over.new-high-score {
+            color: rgba(241, 196, 15, 0.92);
+        }
+
+        #restartText {
+            top: calc(50% + 15vh);
+            top: calc(50% + 15dvh);
+            z-index: 1000;
+            display: none;
+            white-space: normal;
+        }
+
+        @media (max-height: 500px) {
+            #bestScoreDisplay {
+                top: calc(50% - 15vh);
+                top: calc(50% - 15dvh);
+            }
+        }
+
+        #pauseOverlay {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 64px;
+            height: 64px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            transform: translate(-50%, -50%);
+            opacity: 0;
+            pointer-events: none;
+            z-index: 1200;
+            transition: opacity 0.16s linear;
+        }
+
+        #pauseOverlay .pauseBar {
+            width: 10px;
+            height: 42px;
+            border-radius: 999px;
+            background: rgba(235, 244, 255, 0.78);
+            box-shadow:
+                0 0 10px rgba(12, 24, 37, 0.22),
+                0 0 24px rgba(255, 255, 255, 0.08);
+        }
+
+        .hudIconButton {
+            position: absolute;
+            width: 30px;
+            height: 30px;
+            padding: 0;
+            border: 0;
+            border-radius: 0;
+            background: transparent;
+            color: rgba(255,255,255,0.68);
+            font: inherit;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1100;
+            cursor: pointer;
+            text-shadow:
+                0 0 4px var(--bg-bottom),
+                0 0 10px var(--bg-bottom);
+        }
+
+        .hudIconButton:hover,
+        .hudIconButton:focus-visible {
+            color: rgba(255,255,255,0.96);
+            outline: none;
+        }
+
+        .hudIconButton svg {
+            width: 22px;
+            height: 22px;
+            display: block;
+            stroke: currentColor;
+            fill: none;
+            stroke-width: 1.8;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            filter:
+                drop-shadow(0 0 1px var(--bg-bottom))
+                drop-shadow(0 0 6px var(--bg-bottom));
+        }
+
+        #muteToggle {
+            top: calc(var(--safe-top) + 24px);
+            right: calc(var(--safe-right) + 24px);
+        }
+
+        #muteToggle .icon-muted {
+            display: none;
+        }
+
+        #muteToggle[aria-pressed="true"] .icon-on {
+            display: none;
+        }
+
+        #muteToggle[aria-pressed="true"] .icon-muted {
+            display: block;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div id="safeAreaProbe" aria-hidden="true"></div>
+    <div id="gameArea">
+        <div id="levelIndicator">1</div>
+        <div id="playfieldTint" aria-hidden="true"></div>
+        <div id="outsideGlow" aria-hidden="true"></div>
+        <div id="edgeGlow" aria-hidden="true">
+            <div class="edgeGlowSide edgeGlowTop"></div>
+            <div class="edgeGlowSide edgeGlowRight"></div>
+            <div class="edgeGlowSide edgeGlowBottom"></div>
+            <div class="edgeGlowSide edgeGlowLeft"></div>
+        </div>
+        <div id="playfieldBorder" aria-hidden="true"></div>
+        <div id="edgeThreatOverlay" aria-hidden="true">
+            <div class="edgeThreatCutout edgeThreatTop"></div>
+            <div class="edgeThreatCutout edgeThreatRight"></div>
+            <div class="edgeThreatCutout edgeThreatBottom"></div>
+            <div class="edgeThreatCutout edgeThreatLeft"></div>
+        </div>
+        <div id="trailContainer" aria-hidden="true"></div>
+        <div id="particleContainer" aria-hidden="true"></div>
+        <div id="dominoContainer"></div>
+        <div id="ball"></div>
+        <div id="ballCallout" aria-hidden="true"></div>
+        <div id="mouseOriginLine" aria-hidden="true"></div>
+        <div id="mouseOriginCrosshair" aria-hidden="true"></div>
+        <div id="pauseOverlay" aria-hidden="true">
+            <span class="pauseBar"></span>
+            <span class="pauseBar"></span>
+        </div>
+        <div id="transitionFlash" aria-hidden="true"></div>
+    </div>
+
+    <div id="introText">lightly tilt phone to knock all blocks<br>but don't fall off the board</div>
+    <div id="bestScoreDisplay">Best: 0</div>
+    <div id="restartText">tap anywhere to start</div>
+    <button id="muteToggle" class="hudIconButton" type="button" aria-pressed="false" aria-label="Mute sound" title="Mute sound">
+        <svg class="icon-on" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M5 10h4l5-4v12l-5-4H5z"></path>
+            <path d="M18 9a4.5 4.5 0 0 1 0 6"></path>
+            <path d="M20.5 6.5a8 8 0 0 1 0 11"></path>
+        </svg>
+        <svg class="icon-muted" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M5 10h4l5-4v12l-5-4H5z"></path>
+            <path d="M17 9l5 6"></path>
+            <path d="M22 9l-5 6"></path>
+        </svg>
+    </button>
+
+    <script>
+        const gameArea = document.getElementById('gameArea');
+        const safeAreaProbe = document.getElementById('safeAreaProbe');
+        const themeColorMetas = Array.from(document.querySelectorAll('meta[name="theme-color"]'));
+        const ball = document.getElementById('ball');
+        const dominoContainer = document.getElementById('dominoContainer');
+        const levelIndicator = document.getElementById('levelIndicator');
+        const restartText = document.getElementById('restartText');
+        const introText = document.getElementById('introText');
+        const bestScoreDisplay = document.getElementById('bestScoreDisplay');
+        const trailContainer = document.getElementById('trailContainer');
+        const particleContainer = document.getElementById('particleContainer');
+        const ballCallout = document.getElementById('ballCallout');
+        const playfieldTint = document.getElementById('playfieldTint');
+        const outsideGlow = document.getElementById('outsideGlow');
+        const edgeGlow = document.getElementById('edgeGlow');
+        const edgeGlowTop = document.querySelector('.edgeGlowTop');
+        const edgeGlowRight = document.querySelector('.edgeGlowRight');
+        const edgeGlowBottom = document.querySelector('.edgeGlowBottom');
+        const edgeGlowLeft = document.querySelector('.edgeGlowLeft');
+        const playfieldBorder = document.getElementById('playfieldBorder');
+        const edgeThreatOverlay = document.getElementById('edgeThreatOverlay');
+        const edgeThreatTop = document.querySelector('.edgeThreatTop');
+        const edgeThreatRight = document.querySelector('.edgeThreatRight');
+        const edgeThreatBottom = document.querySelector('.edgeThreatBottom');
+        const edgeThreatLeft = document.querySelector('.edgeThreatLeft');
+        const pauseOverlay = document.getElementById('pauseOverlay');
+        const mouseOriginLine = document.getElementById('mouseOriginLine');
+        const mouseOriginCrosshair = document.getElementById('mouseOriginCrosshair');
+        const transitionFlash = document.getElementById('transitionFlash');
+        const muteToggle = document.getElementById('muteToggle');
+
+        let x, y, vx, vy, ax, ay;
+        let baselineX = null, baselineY = null;
+        let baselineBeta = null, baselineGamma = null;
+        let latestOrientationBeta = null, latestOrientationGamma = null;
+        let width = 0, height = 0;
+        let viewportWidth = 0, viewportHeight = 0;
+        let safeInsets = { top: 0, right: 0, bottom: 0, left: 0 };
+        const radius = 25;
+        const dampening = 0.6;
+        const levelOneBallFriction = 0.985;
+        const levelFrictionStep = 0.0015;
+        const earlyMaxBallFriction = 0.997;
+        const lateLevelBallFrictionStep = 0.00012;
+        const maxBallFriction = 0.9992;
+        const blockFriction = 0.9972;
+        const maxBlockSpeed = 22;
+        const maxAngularVelocity = 8;
+        const angularVelocityDamping = 0.92;
+        const angularImpactStrength = 0.05;
+        const desktopBallFrictionBonus = 0.0014;
+        const mouseAccelerationStrength = 0.88;
+        const desktopAccelerationRampStartLevel = 9;
+        const desktopAccelerationStep = 0.045;
+        const desktopAccelerationMaxMultiplier = 2.15;
+        const mouseControlRange = 220;
+        const maxBlockCount = 8;
+        const blockSize = 45;
+        const knockedBlockLifetimeMs = 2000;
+        const dominoExitBuffer = 96;
+        const levelGrowDurationMs = 1000;
+        const idleShrinkStepFraction = 0.1;
+        const shrinkSlipperinessBonus = 0.1;
+        const ballCalloutDurationMs = 900;
+        const dominoHitCooldownMs = 140;
+        const wallCalloutCooldownMs = 450;
+        const dominoCalloutChainWindowMs = 900;
+        const levelCountdownTickOneMs = 5000;
+        const levelCountdownTickTwoMs = 6000;
+        const levelStartShrinkDelayMs = 7000;
+        const levelCountdownFlashDurationMs = 260;
+        const playfieldPauseTouchDedupMs = 700;
+        const playfieldPauseStartGuardMs = 700;
+        const continuousPlayfieldShrinkPerMs = idleShrinkStepFraction / 6000;
+        const playfieldShrinkSpeedPerLevelMultiplier = 0.04;
+        const blockKnockShrinkPauseMs = 500;
+        const wallKnockMinExpandFraction = 0.016;
+        const wallKnockMaxExpandFraction = 0.078;
+        const wallKnockMinDurationMs = 150;
+        const wallKnockMaxDurationMs = 220;
+        const edgeDangerDistancePx = 140;
+        const edgeDangerProjectionDistancePx = 320;
+        const edgeDangerProjectionFrames = 34;
+        const edgeDangerSpeedFloor = 0.55;
+        const edgeDangerSpeedCeiling = 8.2;
+        const edgeDangerWholeBorderFadeStart = 0.24;
+        const edgeDangerWholeBorderFadeEnd = 0.62;
+        const edgeDangerFadeOutPerFrame = 0.32;
+        const edgeDangerFadeInPerFrame = 0.055;
+        const edgeDangerClearPerFrame = 0.028;
+        const minimumPlayfieldInsetPx = 10;
+        const previewMinLevel = 1;
+        const previewMaxLevel = 30;
+        const trailLength = 10;
+        const trailHistoryStep = 2;
+        const trailNodes = [];
+        let currentPlayfieldBaseBorderOpacity = 0;
+        const currentBorderDangerFade = {
+            top: 0,
+            right: 0,
+            bottom: 0,
+            left: 0
+        };
+        const gameOverTransparentBorders = {
+            top: false,
+            right: false,
+            bottom: false,
+            left: false
+        };
+        const trailHistory = [];
+        const particles = [];
+        const levelThemes = [
+            {
+                minLevel: 1,
+                bgTop: '#324b61',
+                bgBottom: '#0c1825',
+                bgAccent: 'rgba(123, 193, 255, 0.2)',
+                bgAccentSoft: 'rgba(74, 113, 161, 0.18)',
+                levelShadow: 'rgba(123, 193, 255, 0.18)',
+                ballHighlight: '#fff2b4',
+                ballMid: '#f4c542',
+                ballDark: '#cc8c05',
+                ballGlow: 'rgba(244, 197, 66, 0.34)',
+                trailColor: 'rgba(244, 197, 66, 0.5)',
+                blockLight: '#f7d754',
+                blockMid: '#f1c40f',
+                blockDark: '#c79607',
+                knockedLight: '#566a7f',
+                knockedMid: '#34495e',
+                knockedDark: '#233240',
+                edgeColor: 'rgba(221, 236, 255, 0.24)',
+                flashColor: 'rgba(123, 193, 255, 0.2)',
+                particleColors: ['#ffe082', '#89c8ff']
+            },
+            {
+                minLevel: 5,
+                bgTop: '#214e5c',
+                bgBottom: '#071920',
+                bgAccent: 'rgba(88, 228, 214, 0.22)',
+                bgAccentSoft: 'rgba(66, 161, 165, 0.16)',
+                levelShadow: 'rgba(88, 228, 214, 0.22)',
+                ballHighlight: '#fff1d6',
+                ballMid: '#ffbe73',
+                ballDark: '#d2701d',
+                ballGlow: 'rgba(255, 190, 115, 0.34)',
+                trailColor: 'rgba(255, 190, 115, 0.48)',
+                blockLight: '#ffe0b6',
+                blockMid: '#f4a24a',
+                blockDark: '#b96011',
+                knockedLight: '#4a7476',
+                knockedMid: '#2f4e51',
+                knockedDark: '#18292b',
+                edgeColor: 'rgba(228, 255, 251, 0.24)',
+                flashColor: 'rgba(88, 228, 214, 0.2)',
+                particleColors: ['#ffc98f', '#8feef4']
+            },
+            {
+                minLevel: 10,
+                bgTop: '#2b4360',
+                bgBottom: '#08111c',
+                bgAccent: 'rgba(124, 171, 221, 0.22)',
+                bgAccentSoft: 'rgba(67, 102, 140, 0.18)',
+                levelShadow: 'rgba(124, 171, 221, 0.2)',
+                ballHighlight: '#fbffd8',
+                ballMid: '#d7f26a',
+                ballDark: '#93b119',
+                ballGlow: 'rgba(215, 242, 106, 0.34)',
+                trailColor: 'rgba(215, 242, 106, 0.48)',
+                blockLight: '#f5ffc0',
+                blockMid: '#cde95a',
+                blockDark: '#86a611',
+                knockedLight: '#5a6775',
+                knockedMid: '#384553',
+                knockedDark: '#1d2731',
+                edgeColor: 'rgba(226, 238, 255, 0.24)',
+                flashColor: 'rgba(124, 171, 221, 0.18)',
+                particleColors: ['#d8f774', '#9bc3f3']
+            },
+            {
+                minLevel: 15,
+                bgTop: '#1d4950',
+                bgBottom: '#071317',
+                bgAccent: 'rgba(106, 206, 220, 0.22)',
+                bgAccentSoft: 'rgba(58, 120, 132, 0.18)',
+                levelShadow: 'rgba(106, 206, 220, 0.2)',
+                ballHighlight: '#fff0d8',
+                ballMid: '#ffc78e',
+                ballDark: '#d17a2b',
+                ballGlow: 'rgba(255, 199, 142, 0.34)',
+                trailColor: 'rgba(255, 199, 142, 0.5)',
+                blockLight: '#ffe3bf',
+                blockMid: '#f8b56c',
+                blockDark: '#bf6c1a',
+                knockedLight: '#567076',
+                knockedMid: '#34474b',
+                knockedDark: '#1a272a',
+                edgeColor: 'rgba(221, 248, 252, 0.24)',
+                flashColor: 'rgba(106, 206, 220, 0.18)',
+                particleColors: ['#ffd2a0', '#8fe6f0']
+            },
+            {
+                minLevel: 20,
+                bgTop: '#4a2848',
+                bgBottom: '#120814',
+                bgAccent: 'rgba(192, 133, 220, 0.22)',
+                bgAccentSoft: 'rgba(101, 66, 122, 0.18)',
+                levelShadow: 'rgba(192, 133, 220, 0.2)',
+                ballHighlight: '#fff2cf',
+                ballMid: '#ffd86c',
+                ballDark: '#d49a11',
+                ballGlow: 'rgba(255, 216, 108, 0.34)',
+                trailColor: 'rgba(255, 216, 108, 0.5)',
+                blockLight: '#ffeaa8',
+                blockMid: '#f4c94f',
+                blockDark: '#bf8c08',
+                knockedLight: '#6f5f79',
+                knockedMid: '#49394f',
+                knockedDark: '#241d28',
+                edgeColor: 'rgba(244, 232, 255, 0.24)',
+                flashColor: 'rgba(192, 133, 220, 0.18)',
+                particleColors: ['#ffe08a', '#d6a8f5']
+            },
+            {
+                minLevel: 25,
+                bgTop: '#23314f',
+                bgBottom: '#070c15',
+                bgAccent: 'rgba(132, 164, 223, 0.22)',
+                bgAccentSoft: 'rgba(70, 92, 135, 0.18)',
+                levelShadow: 'rgba(132, 164, 223, 0.2)',
+                ballHighlight: '#e8fbff',
+                ballMid: '#99f1ff',
+                ballDark: '#2ea7c2',
+                ballGlow: 'rgba(153, 241, 255, 0.34)',
+                trailColor: 'rgba(153, 241, 255, 0.5)',
+                blockLight: '#cbfbff',
+                blockMid: '#73e7fa',
+                blockDark: '#2094af',
+                knockedLight: '#5d697c',
+                knockedMid: '#3a4657',
+                knockedDark: '#1d2631',
+                edgeColor: 'rgba(229, 239, 255, 0.24)',
+                flashColor: 'rgba(132, 164, 223, 0.18)',
+                particleColors: ['#9befff', '#b6cfff']
+            }
+        ];
+        let dominoes = [];
+        let currentTheme = levelThemes[0];
+        let level = 1;
+        let isPlaying = false;
+        let isFalling = false;
+        let isPaused = false;
+        let isLevelingUp = false;
+        let isShowingGameOver = false;
+        let ballScale = 1;
+        let bestScore = readBestScore();
+        let isMuted = readMutePreference();
+        let bestScoreBeforeRun = bestScore;
+        let previewLevel = readPreviewLevel();
+        let currentRunStartLevel = previewLevel;
+        let currentRunIsPreview = previewLevel > 1;
+        let playfieldScale = 1;
+        let lastPlayfieldScaleUpdateAt = performance.now();
+        let shrinkPausedUntil = -Infinity;
+        let levelGrowAnimation = null;
+        let transitionFlashOpacity = 0;
+        let animationFrameId = null;
+        let levelAdvanceTimeoutId = null;
+        let motionListenerAttached = false;
+        let orientationListenerAttached = false;
+        let motionSampleCount = 0;
+        let orientationSampleCount = 0;
+        let activeInputMode = 'none';
+        let pointerControlActive = false;
+        let mouseOriginCaptured = false;
+        let pointerAnchorX = 0;
+        let pointerAnchorY = 0;
+        let pointerControlId = null;
+        let awaitingStartInput = false;
+        let startInputTimeoutId = null;
+        let motionPermissionGranted = false;
+        let wasAutoPausedOnBlur = false;
+        let pauseStartedAt = null;
+        let lastPlayfieldPauseTouchAt = -Infinity;
+        let lastGameStartedAt = -Infinity;
+        let levelStartedAt = performance.now();
+        let levelCountdownTickCount = 0;
+        let activeBallCallout = null;
+        let dominoCalloutCount = 0;
+        let lastDominoCalloutAt = -Infinity;
+        function createTrailNodes() {
+            for (let i = 0; i < trailLength; i++) {
+                const node = document.createElement('div');
+                node.className = 'trailGhost';
+                trailContainer.appendChild(node);
+                trailNodes.push(node);
+            }
+        }
+
+        function readPreviewLevel() {
+            const previewParam = Number(new URLSearchParams(window.location.search).get('preview') || 1);
+            if (!Number.isFinite(previewParam)) {
+                return 1;
+            }
+            return Math.max(previewMinLevel, Math.min(previewMaxLevel, Math.round(previewParam)));
+        }
+
+        function getDisplayLevel() {
+            if (isPlaying || isFalling || isShowingGameOver) {
+                return level;
+            }
+            return previewLevel;
+        }
+
+        function positionBallAtCenter() {
+            x = safeInsets.left + (viewportWidth / 2);
+            y = safeInsets.top + (viewportHeight / 2);
+            ballScale = 1;
+            ball.style.opacity = '1';
+            ball.style.transform = `translate(${x - radius}px, ${y - radius}px) scale(${getBallVisualScale().toFixed(3)})`;
+        }
+
+        function updateOverlayTextLayout(now = performance.now()) {
+            introText.classList.toggle('game-over', isShowingGameOver);
+            const overlayScale = getPlayfieldScale(now);
+            const isDesktopPointer = shouldUseKeyboardPrompt();
+            const isStandaloneMobile = !isDesktopPointer && isStandaloneDisplayMode();
+            const centerX = safeInsets.left + (viewportWidth / 2);
+            const centerY = safeInsets.top + (viewportHeight / 2);
+            const introBaseTop = safeInsets.top + (viewportHeight * 0.30);
+            const levelBaseY = safeInsets.top + (viewportHeight * 0.52);
+            const bestBaseTop = safeInsets.top + (viewportHeight * (
+                isStandaloneMobile
+                    ? (viewportHeight <= 500 ? 0.26 : 0.28)
+                    : (viewportHeight <= 500 ? 0.35 : 0.39)
+            ));
+            const restartBaseTop = safeInsets.top + (viewportHeight * 0.65);
+
+            introText.style.left = `${centerX}px`;
+            introText.style.top = `${centerY + ((introBaseTop - centerY) * overlayScale)}px`;
+            introText.style.setProperty('--overlay-text-scale', overlayScale.toFixed(3));
+
+            levelIndicator.style.left = `${centerX}px`;
+            levelIndicator.style.top = `${centerY + ((levelBaseY - centerY) * overlayScale)}px`;
+
+            bestScoreDisplay.style.left = `${centerX}px`;
+            bestScoreDisplay.style.top = `${centerY + ((bestBaseTop - centerY) * overlayScale)}px`;
+            bestScoreDisplay.style.setProperty('--overlay-text-scale', overlayScale.toFixed(3));
+
+            restartText.style.left = `${centerX}px`;
+            restartText.style.top = `${centerY + ((restartBaseTop - centerY) * overlayScale)}px`;
+            restartText.style.setProperty('--overlay-text-scale', overlayScale.toFixed(3));
+
+            levelIndicator.style.setProperty('--level-indicator-scale', overlayScale.toFixed(3));
+        }
+
+        function showMouseOriginCrosshair() {
+            if (!shouldUseKeyboardPrompt()) return;
+            mouseOriginCrosshair.style.transform = `translate(${pointerAnchorX}px, ${pointerAnchorY}px)`;
+            mouseOriginCrosshair.style.opacity = '1';
+        }
+
+        function updateMouseOriginLine(mouseX, mouseY) {
+            if (!shouldUseKeyboardPrompt() || !mouseOriginCaptured) return;
+            const dx = mouseX - pointerAnchorX;
+            const dy = mouseY - pointerAnchorY;
+            const distance = Math.hypot(dx, dy);
+            const angle = Math.atan2(dy, dx);
+            mouseOriginLine.style.width = `${distance.toFixed(1)}px`;
+            mouseOriginLine.style.transform = `translate(${pointerAnchorX}px, ${pointerAnchorY}px) rotate(${angle}rad)`;
+            mouseOriginLine.style.opacity = distance > 3 ? '1' : '0';
+        }
+
+        function hideMouseOriginCrosshair() {
+            mouseOriginCrosshair.style.opacity = '0';
+            mouseOriginCrosshair.style.transform = 'translate(-9999px, -9999px)';
+            mouseOriginLine.style.opacity = '0';
+            mouseOriginLine.style.width = '0';
+            mouseOriginLine.style.transform = 'translate(-9999px, -9999px)';
+        }
+
+        function isMilestoneLevel(value) {
+            return value >= 5 && value % 5 === 0;
+        }
+
+        function getThemeForLevel(value) {
+            let selectedTheme = levelThemes[0];
+            for (const theme of levelThemes) {
+                if (value >= theme.minLevel) {
+                    selectedTheme = theme;
+                } else {
+                    break;
+                }
+            }
+            return selectedTheme;
+        }
+
+        function hexToRgb(hex) {
+            if (typeof hex !== 'string') return { r: 244, g: 197, b: 66 };
+            const normalized = hex.trim().replace('#', '');
+            if (!/^[0-9a-fA-F]{6}$/.test(normalized)) return { r: 244, g: 197, b: 66 };
+            return {
+                r: parseInt(normalized.slice(0, 2), 16),
+                g: parseInt(normalized.slice(2, 4), 16),
+                b: parseInt(normalized.slice(4, 6), 16)
+            };
+        }
+
+        function hexToRgba(hex, alpha) {
+            const { r, g, b } = hexToRgb(hex);
+            return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+        }
+
+        function applyThemeForLevel(value) {
+            currentTheme = getThemeForLevel(value);
+            const rootStyle = document.documentElement.style;
+            rootStyle.setProperty('--bg-top', currentTheme.bgTop);
+            rootStyle.setProperty('--bg-bottom', currentTheme.bgBottom);
+            rootStyle.setProperty('--bg-accent', currentTheme.bgAccent);
+            rootStyle.setProperty('--bg-accent-soft', currentTheme.bgAccentSoft);
+            rootStyle.setProperty('--level-shadow', currentTheme.levelShadow);
+            rootStyle.setProperty('--ball-highlight', currentTheme.ballHighlight);
+            rootStyle.setProperty('--ball-mid', currentTheme.ballMid);
+            rootStyle.setProperty('--ball-dark', currentTheme.ballDark);
+            rootStyle.setProperty('--ball-glow', currentTheme.ballGlow);
+            rootStyle.setProperty('--trail-color', currentTheme.trailColor);
+            rootStyle.setProperty('--block-light', currentTheme.blockLight);
+            rootStyle.setProperty('--block-mid', currentTheme.blockMid);
+            rootStyle.setProperty('--block-dark', currentTheme.blockDark);
+            rootStyle.setProperty('--knocked-light', currentTheme.knockedLight);
+            rootStyle.setProperty('--knocked-mid', currentTheme.knockedMid);
+            rootStyle.setProperty('--knocked-dark', currentTheme.knockedDark);
+            rootStyle.setProperty('--edge-color', hexToRgba(currentTheme.blockMid || currentTheme.ballMid, 0.34));
+            rootStyle.setProperty('--flash-color', currentTheme.flashColor);
+            document.documentElement.style.backgroundColor = '#000000';
+            document.body.style.backgroundColor = '#000000';
+            for (const themeColorMeta of themeColorMetas) {
+                themeColorMeta.setAttribute('content', '#000000');
+            }
+        }
+
+        function bumpLevelIndicator() {
+            levelIndicator.classList.remove('pop');
+            void levelIndicator.offsetWidth;
+            levelIndicator.classList.add('pop');
+        }
+
+        function triggerTransitionFlash(strength = 0.24) {
+            transitionFlashOpacity = Math.max(transitionFlashOpacity, strength);
+            transitionFlash.style.opacity = transitionFlashOpacity.toFixed(3);
+        }
+
+        let audioCtx, rollOsc, rollGain, shrinkWarnOsc, shrinkWarnGain;
+        function initAudio() {
+            if (audioCtx) return;
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            audioCtx = new AudioContext();
+            rollOsc = audioCtx.createOscillator();
+            rollGain = audioCtx.createGain();
+            shrinkWarnOsc = audioCtx.createOscillator();
+            shrinkWarnGain = audioCtx.createGain();
+            const filter = audioCtx.createBiquadFilter();
+            const shrinkWarnFilter = audioCtx.createBiquadFilter();
+            rollOsc.type = 'triangle';
+            rollOsc.frequency.value = 30;
+            filter.type = 'lowpass';
+            filter.frequency.value = 150;
+            rollGain.gain.value = 0;
+            shrinkWarnOsc.type = 'triangle';
+            shrinkWarnOsc.frequency.value = 420;
+            shrinkWarnFilter.type = 'bandpass';
+            shrinkWarnFilter.frequency.value = 340;
+            shrinkWarnFilter.Q.value = 1.2;
+            shrinkWarnGain.gain.value = 0;
+            rollOsc.connect(filter);
+            filter.connect(rollGain);
+            rollGain.connect(audioCtx.destination);
+            shrinkWarnOsc.connect(shrinkWarnFilter);
+            shrinkWarnFilter.connect(shrinkWarnGain);
+            shrinkWarnGain.connect(audioCtx.destination);
+            rollOsc.start();
+            shrinkWarnOsc.start();
+        }
+
+        function playSound(freq, vol, dur, type = 'sine') {
+            if (!audioCtx || isMuted) return;
+            const osc = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            osc.type = type;
+            osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(10, audioCtx.currentTime + dur);
+            gainNode.gain.setValueAtTime(vol, audioCtx.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + dur);
+            osc.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + dur);
+        }
+
+        function playShrinkTick(volume = 0.016, duration = 0.075, frequency = 420) {
+            if (!audioCtx || isMuted) return;
+
+            const now = audioCtx.currentTime;
+            const osc = audioCtx.createOscillator();
+            const filter = audioCtx.createBiquadFilter();
+            const gainNode = audioCtx.createGain();
+
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(frequency, now);
+            osc.frequency.exponentialRampToValueAtTime(Math.max(140, frequency * 0.48), now + duration);
+
+            filter.type = 'bandpass';
+            filter.frequency.setValueAtTime(frequency * 0.8, now);
+            filter.Q.value = 1.4;
+
+            gainNode.gain.setValueAtTime(0.0001, now);
+            gainNode.gain.exponentialRampToValueAtTime(volume, now + 0.01);
+            gainNode.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+
+            osc.connect(filter);
+            filter.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+            osc.start(now);
+            osc.stop(now + duration + 0.02);
+        }
+
+        function setShrinkWarningTone(active, frequency = 420) {
+            if (!audioCtx || !shrinkWarnOsc || !shrinkWarnGain) return;
+
+            const now = audioCtx.currentTime;
+            const targetFrequency = Math.max(220, frequency);
+            const targetGain = active && !isMuted && !isPaused ? 0.0038 : 0;
+
+            shrinkWarnOsc.frequency.setTargetAtTime(targetFrequency, now, 0.05);
+            shrinkWarnGain.gain.setTargetAtTime(targetGain, now, active ? 0.06 : 0.04);
+        }
+
+        function readBestScore() {
+            try {
+                return Number(localStorage.getItem('theEdgeBestScore') || 0);
+            } catch {
+                return 0;
+            }
+        }
+
+        function persistBestScore(score) {
+            try {
+                localStorage.setItem('theEdgeBestScore', score);
+            } catch {
+                // Storage can be unavailable in some iOS private / standalone contexts.
+            }
+        }
+
+        function readMutePreference() {
+            try {
+                return localStorage.getItem('theEdgeMuted') === '1';
+            } catch {
+                return false;
+            }
+        }
+
+        function persistMutePreference() {
+            try {
+                localStorage.setItem('theEdgeMuted', isMuted ? '1' : '0');
+            } catch {
+                // Storage can be unavailable in some iOS private / standalone contexts.
+            }
+        }
+
+        function applyMuteState() {
+            muteToggle.setAttribute('aria-pressed', String(isMuted));
+            muteToggle.setAttribute('aria-label', isMuted ? 'Unmute sound' : 'Mute sound');
+            muteToggle.title = isMuted ? 'Unmute sound' : 'Mute sound';
+            if (rollGain && audioCtx) {
+                rollGain.gain.setTargetAtTime(0, audioCtx.currentTime, 0.05);
+            }
+            setShrinkWarningTone(false);
+        }
+
+        function applyPauseState() {
+            pauseOverlay.style.opacity = isPaused ? '1' : '0';
+            if (isPaused && rollGain && audioCtx) {
+                rollGain.gain.setTargetAtTime(0, audioCtx.currentTime, 0.05);
+            }
+            if (isPaused) {
+                setShrinkWarningTone(false);
+            }
+        }
+
+        function beginGameplayPause(now = performance.now()) {
+            pauseStartedAt = now;
+            lastPlayfieldScaleUpdateAt = now;
+        }
+
+        function resumeGameplayPause(now = performance.now()) {
+            const pauseDuration = pauseStartedAt === null ? 0 : Math.max(0, now - pauseStartedAt);
+            pauseStartedAt = null;
+            lastPlayfieldScaleUpdateAt = now;
+
+            if (pauseDuration <= 0) return;
+
+            shrinkPausedUntil += pauseDuration;
+            levelStartedAt += pauseDuration;
+            if (levelGrowAnimation) {
+                levelGrowAnimation.startedAt += pauseDuration;
+            }
+        }
+
+        function togglePause() {
+            if (!isPlaying && !isFalling) return;
+            const now = performance.now();
+            isPaused = !isPaused;
+            if (isPaused) {
+                beginGameplayPause(now);
+            } else {
+                wasAutoPausedOnBlur = false;
+                resumeGameplayPause(now);
+                if (shouldUseKeyboardPrompt()) {
+                    resetDesktopMouseOrigin();
+                } else {
+                    resetMobileControlOrigin();
+                }
+            }
+            applyPauseState();
+        }
+
+        function handlePlayfieldPauseToggle(event) {
+            if (!isPlaying) return;
+            const now = performance.now();
+            if (now - lastGameStartedAt < playfieldPauseStartGuardMs) {
+                return;
+            }
+            if (event.type === 'click' && now - lastPlayfieldPauseTouchAt < playfieldPauseTouchDedupMs) {
+                return;
+            }
+            if (event.type === 'touchend') {
+                lastPlayfieldPauseTouchAt = now;
+            }
+            if (event.cancelable) {
+                event.preventDefault();
+            }
+            togglePause();
+        }
+
+        function toggleMute() {
+            isMuted = !isMuted;
+            persistMutePreference();
+            applyMuteState();
+        }
+
+        function updateViewportBounds() {
+            const probeStyles = getComputedStyle(safeAreaProbe);
+            safeInsets = {
+                top: parseFloat(probeStyles.paddingTop) || 0,
+                right: parseFloat(probeStyles.paddingRight) || 0,
+                bottom: parseFloat(probeStyles.paddingBottom) || 0,
+                left: parseFloat(probeStyles.paddingLeft) || 0
+            };
+
+            const viewport = window.visualViewport;
+            viewportWidth = Math.max(window.innerWidth, viewport ? viewport.width : 0);
+            viewportHeight = Math.max(window.innerHeight, viewport ? viewport.height : 0);
+            width = viewportWidth + safeInsets.left + safeInsets.right;
+            height = viewportHeight + safeInsets.top + safeInsets.bottom;
+
+            gameArea.style.left = `${-safeInsets.left}px`;
+            gameArea.style.top = `${-safeInsets.top}px`;
+            gameArea.style.width = `${width}px`;
+            gameArea.style.height = `${height}px`;
+
+            introText.innerHTML = getIntroCopy();
+            updatePlayfieldFrame();
+
+            if (!isPlaying && !isFalling && !isShowingGameOver) {
+                positionBallAtCenter();
+            }
+        }
+
+        function getPlayfieldScale(now = performance.now()) {
+            return playfieldScale;
+        }
+
+        function getPlayfieldBounds(now = performance.now()) {
+            const playfieldScale = getPlayfieldScale(now);
+            const baseLeft = Math.max(safeInsets.left, minimumPlayfieldInsetPx);
+            const baseRight = width - Math.max(safeInsets.right, minimumPlayfieldInsetPx);
+            const baseTop = Math.max(safeInsets.top, minimumPlayfieldInsetPx);
+            const baseBottom = height - Math.max(safeInsets.bottom, minimumPlayfieldInsetPx);
+            const insetX = ((baseRight - baseLeft) * (1 - playfieldScale)) / 2;
+            const insetY = ((baseBottom - baseTop) * (1 - playfieldScale)) / 2;
+            return {
+                left: baseLeft + insetX,
+                right: baseRight - insetX,
+                top: baseTop + insetY,
+                bottom: baseBottom - insetY
+            };
+        }
+
+        function getPlayfieldCornerRadius(frameWidth, frameHeight) {
+            const shortestSide = Math.min(frameWidth, frameHeight);
+            if (shortestSide <= 0) return 0;
+
+            const preferredRadius = shouldUseKeyboardPrompt()
+                ? shortestSide * 0.055
+                : shortestSide * 0.1;
+
+            return Math.min(shortestSide / 2, Math.max(18, Math.min(preferredRadius, 44)));
+        }
+
+        function isPointInsidePlayfield(px, py, now = performance.now()) {
+            const bounds = getPlayfieldBounds(now);
+            const frameWidth = Math.max(0, bounds.right - bounds.left);
+            const frameHeight = Math.max(0, bounds.bottom - bounds.top);
+            const cornerRadius = getPlayfieldCornerRadius(frameWidth, frameHeight);
+
+            if (cornerRadius <= 0) {
+                return px >= bounds.left && px <= bounds.right && py >= bounds.top && py <= bounds.bottom;
+            }
+
+            const innerLeft = bounds.left + cornerRadius;
+            const innerRight = bounds.right - cornerRadius;
+            const innerTop = bounds.top + cornerRadius;
+            const innerBottom = bounds.bottom - cornerRadius;
+
+            if (px >= innerLeft && px <= innerRight && py >= bounds.top && py <= bounds.bottom) {
+                return true;
+            }
+
+            if (py >= innerTop && py <= innerBottom && px >= bounds.left && px <= bounds.right) {
+                return true;
+            }
+
+            const cornerX = px < innerLeft ? innerLeft : innerRight;
+            const cornerY = py < innerTop ? innerTop : innerBottom;
+            return Math.hypot(px - cornerX, py - cornerY) <= cornerRadius;
+        }
+
+
+        function applyPlayfieldBorderThreatOpacity(now = performance.now()) {
+            const bounds = getPlayfieldBounds(now);
+            const frameWidth = Math.max(0, bounds.right - bounds.left);
+            const frameHeight = Math.max(0, bounds.bottom - bounds.top);
+            const borderVisible = frameWidth > 0 && frameHeight > 0;
+            const currentScale = getPlayfieldScale(now);
+            const shrinkAmount = Math.max(0, 1 - currentScale);
+            const shrinkCueState = getLevelShrinkCueState(now);
+            const cueHighlightStrength = shrinkCueState.steadyActive
+                ? 1
+                : shrinkCueState.flashStrength;
+            const borderColorAlpha = Math.min(0.98, 0.78 + (shrinkAmount * 0.12) + (cueHighlightStrength * 0.12));
+            const borderRgb = hexToRgb(currentTheme.blockMid || currentTheme.ballMid);
+            const alphaFor = (side) => {
+                if (!borderVisible) return 0;
+                const fade = clamp01(currentBorderDangerFade[side] || 0);
+                return currentPlayfieldBaseBorderOpacity * borderColorAlpha * (1 - fade);
+            };
+            playfieldBorder.style.borderTopColor = `rgba(${borderRgb.r}, ${borderRgb.g}, ${borderRgb.b}, ${alphaFor('top').toFixed(3)})`;
+            playfieldBorder.style.borderRightColor = `rgba(${borderRgb.r}, ${borderRgb.g}, ${borderRgb.b}, ${alphaFor('right').toFixed(3)})`;
+            playfieldBorder.style.borderBottomColor = `rgba(${borderRgb.r}, ${borderRgb.g}, ${borderRgb.b}, ${alphaFor('bottom').toFixed(3)})`;
+            playfieldBorder.style.borderLeftColor = `rgba(${borderRgb.r}, ${borderRgb.g}, ${borderRgb.b}, ${alphaFor('left').toFixed(3)})`;
+            playfieldBorder.style.opacity = borderVisible ? '1' : '0';
+        }
+
+        function updatePlayfieldFrame(now = performance.now()) {
+            const bounds = getPlayfieldBounds(now);
+            const frameWidth = Math.max(0, bounds.right - bounds.left);
+            const frameHeight = Math.max(0, bounds.bottom - bounds.top);
+            const cornerRadius = getPlayfieldCornerRadius(frameWidth, frameHeight);
+            const borderVisible = frameWidth > 0 && frameHeight > 0;
+            const currentScale = getPlayfieldScale(now);
+            const shrinkAmount = Math.max(0, 1 - currentScale);
+            const shrinkCueState = getLevelShrinkCueState(now);
+            const cueHighlightStrength = shrinkCueState.steadyActive
+                ? 1
+                : shrinkCueState.flashStrength;
+            const playfieldTintOpacity = frameWidth > 0 && frameHeight > 0 ? 1 : 0;
+            const outsideGlowOpacity = borderVisible ? 1 : 0;
+            const outsideGlowNearBlur = 24 + (shrinkAmount * 4);
+            const outsideGlowFarBlur = 64 + (shrinkAmount * 12);
+            const outsideGlowNearSpread = 3 + (shrinkAmount * 2);
+            const outsideGlowFarSpread = 14 + (shrinkAmount * 5);
+
+            edgeGlow.style.left = `${bounds.left}px`;
+            edgeGlow.style.top = `${bounds.top}px`;
+            edgeGlow.style.width = `${frameWidth}px`;
+            edgeGlow.style.height = `${frameHeight}px`;
+            edgeGlow.style.borderRadius = `${cornerRadius.toFixed(2)}px`;
+
+            playfieldTint.style.left = `${bounds.left}px`;
+            playfieldTint.style.top = `${bounds.top}px`;
+            playfieldTint.style.width = `${frameWidth}px`;
+            playfieldTint.style.height = `${frameHeight}px`;
+            playfieldTint.style.borderRadius = `${cornerRadius.toFixed(2)}px`;
+            playfieldTint.style.opacity = playfieldTintOpacity.toFixed(3);
+
+            outsideGlow.style.left = `${bounds.left}px`;
+            outsideGlow.style.top = `${bounds.top}px`;
+            outsideGlow.style.width = `${frameWidth}px`;
+            outsideGlow.style.height = `${frameHeight}px`;
+            outsideGlow.style.opacity = outsideGlowOpacity.toFixed(3);
+            outsideGlow.style.borderRadius = `${cornerRadius.toFixed(2)}px`;
+            outsideGlow.style.boxShadow = `0 0 ${outsideGlowNearBlur}px ${outsideGlowNearSpread}px var(--bg-accent), 0 0 ${outsideGlowFarBlur}px ${outsideGlowFarSpread}px var(--bg-accent-soft)`;
+
+            playfieldBorder.style.left = `${bounds.left}px`;
+            playfieldBorder.style.top = `${bounds.top}px`;
+            playfieldBorder.style.width = `${frameWidth}px`;
+            playfieldBorder.style.height = `${frameHeight}px`;
+            playfieldBorder.style.borderRadius = `${cornerRadius.toFixed(2)}px`;
+
+            edgeThreatOverlay.style.left = `${bounds.left}px`;
+            edgeThreatOverlay.style.top = `${bounds.top}px`;
+            edgeThreatOverlay.style.width = `${frameWidth}px`;
+            edgeThreatOverlay.style.height = `${frameHeight}px`;
+            edgeThreatOverlay.style.borderRadius = `${cornerRadius.toFixed(2)}px`;
+            const baseBorderOpacity = 1;
+            const borderOpacity = borderVisible ? baseBorderOpacity : 0;
+            currentPlayfieldBaseBorderOpacity = borderOpacity;
+            const borderWidth = 4 + (shrinkAmount * 1.1) + (cueHighlightStrength * 1.0);
+            const borderColorAlpha = Math.min(0.98, 0.78 + (shrinkAmount * 0.12) + (cueHighlightStrength * 0.12));
+            const innerGlowAlpha = Math.min(0.54, 0.1 + (shrinkAmount * 0.12) + (cueHighlightStrength * 0.26));
+            const outerGlowAlpha = Math.min(
+                0.32,
+                (cueHighlightStrength * (shrinkCueState.steadyActive ? 0.24 : 0.18)) + (shrinkAmount * 0.05)
+            );
+            const borderRgb = hexToRgb(currentTheme.blockMid || currentTheme.ballMid);
+            const borderGlowRgb = hexToRgb(currentTheme.blockLight || currentTheme.blockMid || currentTheme.ballMid);
+            const borderShadowRgb = hexToRgb(currentTheme.blockDark || currentTheme.blockMid || currentTheme.ballDark || currentTheme.ballMid);
+            playfieldBorder.style.borderWidth = `${borderWidth.toFixed(2)}px`;
+            const hasTransparentBorderSide = ['top', 'right', 'bottom', 'left'].some(
+                (direction) => clamp01(currentBorderDangerFade[direction] || 0) > 0.001
+            );
+            if (isFalling || hasTransparentBorderSide) {
+                playfieldBorder.style.boxShadow = 'none';
+            } else {
+                playfieldBorder.style.boxShadow = `0 0 0 1px rgba(${borderGlowRgb.r}, ${borderGlowRgb.g}, ${borderGlowRgb.b}, ${Math.max(0.10, innerGlowAlpha * 0.82).toFixed(3)}) inset, 0 0 ${Math.round(10 + cueHighlightStrength * 18)}px rgba(${borderRgb.r}, ${borderRgb.g}, ${borderRgb.b}, ${outerGlowAlpha.toFixed(3)}), inset 0 -1px 0 rgba(${borderShadowRgb.r}, ${borderShadowRgb.g}, ${borderShadowRgb.b}, ${Math.max(0.10, borderColorAlpha * 0.38).toFixed(3)})`;
+            }
+            applyPlayfieldBorderThreatOpacity(now);
+            updateOverlayTextLayout(now);
+        }
+
+        function rectanglesOverlap(first, second, gap = 0) {
+            return first.x < second.x + second.width + gap &&
+                first.x + first.width + gap > second.x &&
+                first.y < second.y + second.height + gap &&
+                first.y + first.height + gap > second.y;
+        }
+
+        function resetIdleShrinkState(now = performance.now()) {
+            levelGrowAnimation = null;
+            playfieldScale = 1;
+            lastPlayfieldScaleUpdateAt = now;
+            shrinkPausedUntil = now;
+            updatePlayfieldFrame(now);
+        }
+
+        function getLevelShrinkCueState(now = performance.now()) {
+            if (!isPlaying || isPaused || isLevelingUp || isShowingGameOver || level < 3) {
+                return {
+                    elapsed: 0,
+                    flashStrength: 0,
+                    steadyActive: false
+                };
+            }
+
+            const elapsed = Math.max(0, now - levelStartedAt);
+            let flashStrength = 0;
+            for (const cueAt of [levelCountdownTickOneMs, levelCountdownTickTwoMs]) {
+                const cueElapsed = elapsed - cueAt;
+                if (cueElapsed < 0 || cueElapsed > levelCountdownFlashDurationMs) continue;
+                const pulse = Math.sin((cueElapsed / levelCountdownFlashDurationMs) * Math.PI);
+                flashStrength = Math.max(flashStrength, pulse);
+            }
+
+            return {
+                elapsed,
+                flashStrength,
+                steadyActive: elapsed >= levelStartShrinkDelayMs
+            };
+        }
+
+        function updateLevelShrinkCueAudio(now = performance.now()) {
+            const cueState = getLevelShrinkCueState(now);
+            const countdownActive = level >= 3 && isPlaying && !isPaused && !isLevelingUp;
+
+            setShrinkWarningTone(countdownActive && cueState.steadyActive, 420);
+
+            if (!countdownActive) {
+                return;
+            }
+
+            if (levelCountdownTickCount < 1 && cueState.elapsed >= levelCountdownTickOneMs) {
+                playShrinkTick(0.012, 0.098, 420);
+                levelCountdownTickCount = 1;
+            }
+            if (levelCountdownTickCount < 2 && cueState.elapsed >= levelCountdownTickTwoMs) {
+                playShrinkTick(0.012, 0.098, 420);
+                levelCountdownTickCount = 2;
+            }
+        }
+
+        function armLevelStartShrinkDelay(targetLevel, now = performance.now()) {
+            levelStartedAt = now;
+            levelCountdownTickCount = 0;
+            lastPlayfieldScaleUpdateAt = now;
+            shrinkPausedUntil = targetLevel >= 3 ? now + levelStartShrinkDelayMs : now;
+        }
+
+        function applyPlayfieldScaleRatio(scaleRatio) {
+            if (Math.abs(scaleRatio - 1) <= 0.000001) return;
+
+            const centerX = width / 2;
+            const centerY = height / 2;
+            x = centerX + ((x - centerX) * scaleRatio);
+            y = centerY + ((y - centerY) * scaleRatio);
+
+            for (const domino of dominoes) {
+                const dominoCenterX = centerX + (((domino.x + (domino.width / 2)) - centerX) * scaleRatio);
+                const dominoCenterY = centerY + (((domino.y + (domino.height / 2)) - centerY) * scaleRatio);
+                domino.x = dominoCenterX - (domino.width / 2);
+                domino.y = dominoCenterY - (domino.height / 2);
+            }
+        }
+
+        function easeOutCubic(value) {
+            const t = Math.max(0, Math.min(1, value));
+            return 1 - Math.pow(1 - t, 3);
+        }
+
+        function stopPlayfieldGrowAnimation(now = performance.now()) {
+            if (!levelGrowAnimation) return false;
+            levelGrowAnimation = null;
+            lastPlayfieldScaleUpdateAt = now;
+            updatePlayfieldFrame(now);
+            return true;
+        }
+
+        function startPlayfieldGrowAnimation(now, toScale, durationMs = levelGrowDurationMs, options = {}) {
+            const fromScale = getPlayfieldScale(now);
+            const clampedToScale = Math.max(0, Math.min(1, toScale));
+            const overshootScale = Number.isFinite(options.overshootScale)
+                ? Math.max(clampedToScale, options.overshootScale)
+                : null;
+            const settleDurationMs = overshootScale === null
+                ? 0
+                : Math.max(1, options.settleDurationMs || 0);
+            const effectiveTarget = overshootScale === null ? clampedToScale : overshootScale;
+            const source = typeof options.source === 'string' ? options.source : 'generic';
+
+            if (effectiveTarget <= fromScale + 0.001) {
+                levelGrowAnimation = null;
+                lastPlayfieldScaleUpdateAt = now;
+                return false;
+            }
+
+            levelGrowAnimation = {
+                startedAt: now,
+                fromScale,
+                toScale: clampedToScale,
+                lastScale: fromScale,
+                durationMs,
+                overshootScale,
+                settleDurationMs,
+                source
+            };
+            lastPlayfieldScaleUpdateAt = now;
+            updatePlayfieldFrame(now);
+            return true;
+        }
+
+        function startLevelGrowAnimation(now) {
+            return startPlayfieldGrowAnimation(now, 1, levelGrowDurationMs);
+        }
+
+        function expandPlayfieldOnWallKnock(now, strength = 1) {
+            const normalizedStrength = Math.max(0, Math.min(1, strength));
+            if (normalizedStrength <= 0.02) return false;
+
+            const baseScale = levelGrowAnimation
+                ? Math.max(getPlayfieldScale(now), levelGrowAnimation.toScale)
+                : getPlayfieldScale(now);
+            const expansion = wallKnockMinExpandFraction + ((wallKnockMaxExpandFraction - wallKnockMinExpandFraction) * normalizedStrength);
+            const durationMs = wallKnockMinDurationMs + ((wallKnockMaxDurationMs - wallKnockMinDurationMs) * normalizedStrength);
+            const targetScale = baseScale + expansion;
+            const clampedTargetScale = Math.max(0, Math.min(1, targetScale));
+            const overshootAmount = 0.0015 + (normalizedStrength * 0.0035);
+            const overshootScale = targetScale >= 1
+                ? 1 + (0.0025 + (normalizedStrength * 0.005))
+                : Math.min(1, clampedTargetScale + overshootAmount);
+            const settleDurationMs = 110 + (normalizedStrength * 65);
+
+            return startPlayfieldGrowAnimation(
+                now,
+                clampedTargetScale,
+                durationMs,
+                {
+                    overshootScale,
+                    settleDurationMs,
+                    source: 'wall_knock'
+                }
+            );
+        }
+
+        function updateLevelGrowAnimation(now) {
+            if (!levelGrowAnimation) return false;
+
+            const growDurationMs = Math.max(1, levelGrowAnimation.durationMs || levelGrowDurationMs);
+            const overshootScale = levelGrowAnimation.overshootScale;
+            const settleDurationMs = overshootScale === null
+                ? 0
+                : Math.max(1, levelGrowAnimation.settleDurationMs || 1);
+            const elapsed = Math.max(0, now - levelGrowAnimation.startedAt);
+            const totalDurationMs = growDurationMs + settleDurationMs;
+            let currentScale;
+
+            if (overshootScale !== null) {
+                if (elapsed < growDurationMs) {
+                    const progress = elapsed / growDurationMs;
+                    const easedProgress = easeOutCubic(progress);
+                    currentScale = levelGrowAnimation.fromScale + ((overshootScale - levelGrowAnimation.fromScale) * easedProgress);
+                } else {
+                    const settleProgress = Math.min(1, (elapsed - growDurationMs) / settleDurationMs);
+                    const easedSettleProgress = easeOutCubic(settleProgress);
+                    currentScale = overshootScale + ((levelGrowAnimation.toScale - overshootScale) * easedSettleProgress);
+                }
+            } else {
+                const progress = Math.min(1, elapsed / growDurationMs);
+                const easedProgress = easeOutCubic(progress);
+                currentScale = levelGrowAnimation.fromScale + ((levelGrowAnimation.toScale - levelGrowAnimation.fromScale) * easedProgress);
+            }
+
+            const lastScale = playfieldScale;
+            const scaleRatio = lastScale > 0 ? currentScale / lastScale : 1;
+            applyPlayfieldScaleRatio(scaleRatio);
+            playfieldScale = currentScale;
+            lastPlayfieldScaleUpdateAt = now;
+
+            if (elapsed >= totalDurationMs) {
+                const finalScale = levelGrowAnimation.toScale;
+                levelGrowAnimation = null;
+                playfieldScale = finalScale;
+                updatePlayfieldFrame(now);
+                return false;
+            }
+
+            updatePlayfieldFrame(now);
+            return true;
+        }
+
+        function updateIdleCycle(now) {
+            if (!isPlaying || isPaused || levelGrowAnimation) {
+                lastPlayfieldScaleUpdateAt = now;
+                return;
+            }
+
+            if (now < shrinkPausedUntil) {
+                lastPlayfieldScaleUpdateAt = now;
+                return;
+            }
+
+            const elapsed = Math.max(0, now - lastPlayfieldScaleUpdateAt);
+            lastPlayfieldScaleUpdateAt = now;
+            if (elapsed <= 0 || playfieldScale <= 0) return;
+
+            const nextScale = Math.max(0, playfieldScale - (elapsed * getContinuousPlayfieldShrinkPerMs()));
+            if (Math.abs(nextScale - playfieldScale) <= 0.000001) return;
+
+            const scaleRatio = playfieldScale > 0 ? nextScale / playfieldScale : 1;
+            applyPlayfieldScaleRatio(scaleRatio);
+            playfieldScale = nextScale;
+            updatePlayfieldFrame(now);
+
+            if (playfieldScale <= 0.0005) {
+                playfieldScale = 0;
+                finishRound();
+            }
+        }
+
+        function getBallFriction() {
+            let friction;
+            if (level <= 9) {
+                friction = Math.min(levelOneBallFriction + (level - 1) * levelFrictionStep, earlyMaxBallFriction);
+            } else {
+                friction = Math.min(earlyMaxBallFriction + (level - 9) * lateLevelBallFrictionStep, maxBallFriction);
+            }
+
+            if (shouldUseKeyboardPrompt()) {
+                friction = Math.min(friction + desktopBallFrictionBonus, maxBallFriction);
+            }
+
+            if (!levelGrowAnimation && playfieldScale < 0.999) {
+                friction = 1 - ((1 - friction) * (1 - shrinkSlipperinessBonus));
+            }
+
+            return friction;
+        }
+
+        function getContinuousPlayfieldShrinkPerMs() {
+            if (level < 3) {
+                return 0;
+            }
+
+            const extraLevels = Math.max(0, level - 3);
+            return continuousPlayfieldShrinkPerMs * (1 + (extraLevels * playfieldShrinkSpeedPerLevelMultiplier));
+        }
+
+        function getDesktopMouseAccelerationStrength() {
+            const rampLevels = Math.max(0, level - desktopAccelerationRampStartLevel + 1);
+            const multiplier = Math.min(
+                1 + (rampLevels * desktopAccelerationStep),
+                desktopAccelerationMaxMultiplier
+            );
+            return mouseAccelerationStrength * multiplier;
+        }
+
+        function getBlockCountForLevel(targetLevel) {
+            return Math.min(targetLevel, maxBlockCount);
+        }
+
+        function getBlockSize() {
+            return blockSize;
+        }
+
+        function shouldHighlightCurrentLevel() {
+            return !currentRunIsPreview && bestScoreBeforeRun > 0 && level > bestScoreBeforeRun;
+        }
+
+        function updateBestScoreDisplayState() {
+            const highlightNewBest = shouldHighlightCurrentLevel();
+            const shouldShowBestScore =
+                !currentRunIsPreview &&
+                (isPlaying || isFalling || isShowingGameOver) &&
+                (bestScore > 1 || highlightNewBest);
+
+            bestScoreDisplay.classList.toggle('game-over', isShowingGameOver);
+            bestScoreDisplay.classList.toggle('new-high-score', highlightNewBest);
+            bestScoreDisplay.style.display = shouldShowBestScore ? 'block' : 'none';
+
+            if (shouldShowBestScore) {
+                bestScoreDisplay.innerText = highlightNewBest ? 'New Best' : `Best: ${bestScore}`;
+            }
+        }
+
+        function updateLevelIndicatorState() {
+            const displayLevel = getDisplayLevel();
+            levelIndicator.innerText = displayLevel;
+            levelIndicator.style.display = isPlaying || isFalling || isShowingGameOver ? 'block' : 'none';
+            levelIndicator.classList.toggle('game-over', isShowingGameOver);
+            levelIndicator.classList.toggle('new-best', shouldHighlightCurrentLevel());
+            levelIndicator.classList.toggle('milestone', isMilestoneLevel(displayLevel));
+            applyThemeForLevel(displayLevel);
+            updateBestScoreDisplayState();
+            updateOverlayTextLayout();
+        }
+
+        function clearPendingLevelAdvance() {
+            if (levelAdvanceTimeoutId !== null) {
+                clearTimeout(levelAdvanceTimeoutId);
+                levelAdvanceTimeoutId = null;
+            }
+        }
+
+        function clampValue(value, limit) {
+            return Math.max(-limit, Math.min(limit, value));
+        }
+
+        function clampDominoMotion(domino) {
+            domino.vx = clampValue(domino.vx, maxBlockSpeed);
+            domino.vy = clampValue(domino.vy, maxBlockSpeed);
+            domino.angularVelocity = clampValue(domino.angularVelocity, maxAngularVelocity);
+        }
+
+        function markDominoKnocked(domino, now) {
+            if (domino.knocked) return;
+            domino.knocked = true;
+            domino.knockedAt = now;
+            domino.removeAt = now + knockedBlockLifetimeMs;
+            domino.element.classList.add('knocked');
+            domino.element.style.opacity = '1';
+        }
+
+        function isDominoSolid(domino, now) {
+            return domino.removeAt === null || now < domino.removeAt;
+        }
+
+        function getDominoScale(domino, now) {
+            if (!domino.knocked || domino.knockedAt === null) return 1;
+            return Math.max(0, 1 - Math.min(1, (now - domino.knockedAt) / knockedBlockLifetimeMs));
+        }
+
+        function getBallVisualScale(now = performance.now()) {
+            return ballScale * getPlayfieldScale(now);
+        }
+
+        function getBallRadius(now = performance.now()) {
+            return radius * getBallVisualScale(now);
+        }
+
+        function getDominoGeometry(domino, now) {
+            const scale = getDominoScale(domino, now) * getPlayfieldScale(now);
+            const width = domino.width * scale;
+            const height = domino.height * scale;
+            const centerX = domino.x + (domino.width / 2);
+            const centerY = domino.y + (domino.height / 2);
+
+            if (width <= 0 || height <= 0) {
+                return {
+                    scale,
+                    width,
+                    height,
+                    centerX,
+                    centerY,
+                    halfWidth: 0,
+                    halfHeight: 0,
+                    axisXx: 1,
+                    axisXy: 0,
+                    axisYx: 0,
+                    axisYy: 1,
+                    minX: centerX,
+                    maxX: centerX,
+                    minY: centerY,
+                    maxY: centerY
+                };
+            }
+
+            const halfWidth = width / 2;
+            const halfHeight = height / 2;
+            const angleRadians = domino.angle * (Math.PI / 180);
+            const axisXx = Math.cos(angleRadians);
+            const axisXy = Math.sin(angleRadians);
+            const axisYx = -axisXy;
+            const axisYy = axisXx;
+            const extentX = Math.abs(axisXx * halfWidth) + Math.abs(axisYx * halfHeight);
+            const extentY = Math.abs(axisXy * halfWidth) + Math.abs(axisYy * halfHeight);
+
+            return {
+                scale,
+                width,
+                height,
+                centerX,
+                centerY,
+                halfWidth,
+                halfHeight,
+                axisXx,
+                axisXy,
+                axisYx,
+                axisYy,
+                minX: centerX - extentX,
+                maxX: centerX + extentX,
+                minY: centerY - extentY,
+                maxY: centerY + extentY
+            };
+        }
+
+        function getDominoHitRect(domino, now) {
+            const geometry = getDominoGeometry(domino, now);
+            return {
+                x: geometry.minX,
+                y: geometry.minY,
+                width: geometry.maxX - geometry.minX,
+                height: geometry.maxY - geometry.minY,
+                shapeWidth: geometry.width,
+                shapeHeight: geometry.height,
+                centerX: geometry.centerX,
+                centerY: geometry.centerY
+            };
+        }
+
+        function projectDominoGeometryOntoAxis(geometry, axisX, axisY) {
+            const centerProjection = (geometry.centerX * axisX) + (geometry.centerY * axisY);
+            const projectionRadius =
+                (geometry.halfWidth * Math.abs((geometry.axisXx * axisX) + (geometry.axisXy * axisY))) +
+                (geometry.halfHeight * Math.abs((geometry.axisYx * axisX) + (geometry.axisYy * axisY)));
+
+            return {
+                min: centerProjection - projectionRadius,
+                max: centerProjection + projectionRadius
+            };
+        }
+
+        function getBallDominoCollision(domino, now, ballX, ballY, ballRadius) {
+            const geometry = getDominoGeometry(domino, now);
+            if (geometry.width <= 0 || geometry.height <= 0 || ballRadius <= 0) return null;
+
+            const offsetX = ballX - geometry.centerX;
+            const offsetY = ballY - geometry.centerY;
+            const localX = (offsetX * geometry.axisXx) + (offsetY * geometry.axisXy);
+            const localY = (offsetX * geometry.axisYx) + (offsetY * geometry.axisYy);
+
+            let contactLocalX = clampValue(localX, geometry.halfWidth);
+            let contactLocalY = clampValue(localY, geometry.halfHeight);
+            let deltaLocalX = localX - contactLocalX;
+            let deltaLocalY = localY - contactLocalY;
+            let distance = Math.hypot(deltaLocalX, deltaLocalY);
+            let overlap = ballRadius - distance;
+            let normalLocalX;
+            let normalLocalY;
+
+            if (distance > 0.0001) {
+                normalLocalX = deltaLocalX / distance;
+                normalLocalY = deltaLocalY / distance;
+            } else {
+                const distanceToVerticalEdge = geometry.halfWidth - Math.abs(localX);
+                const distanceToHorizontalEdge = geometry.halfHeight - Math.abs(localY);
+
+                if (distanceToVerticalEdge < distanceToHorizontalEdge) {
+                    normalLocalX = localX >= 0 ? 1 : -1;
+                    normalLocalY = 0;
+                    contactLocalX = normalLocalX * geometry.halfWidth;
+                    contactLocalY = clampValue(localY, geometry.halfHeight);
+                    overlap = ballRadius + distanceToVerticalEdge;
+                } else {
+                    normalLocalX = 0;
+                    normalLocalY = localY >= 0 ? 1 : -1;
+                    contactLocalX = clampValue(localX, geometry.halfWidth);
+                    contactLocalY = normalLocalY * geometry.halfHeight;
+                    overlap = ballRadius + distanceToHorizontalEdge;
+                }
+            }
+
+            if (overlap <= 0) return null;
+
+            const normalX = (normalLocalX * geometry.axisXx) + (normalLocalY * geometry.axisYx);
+            const normalY = (normalLocalX * geometry.axisXy) + (normalLocalY * geometry.axisYy);
+            const contactX = geometry.centerX + (contactLocalX * geometry.axisXx) + (contactLocalY * geometry.axisYx);
+            const contactY = geometry.centerY + (contactLocalX * geometry.axisXy) + (contactLocalY * geometry.axisYy);
+
+            return {
+                overlap,
+                contactX,
+                contactY,
+                normalX,
+                normalY,
+                centerX: geometry.centerX,
+                centerY: geometry.centerY
+            };
+        }
+
+        function getDominoDominoCollision(first, second, now) {
+            const firstGeometry = getDominoGeometry(first, now);
+            const secondGeometry = getDominoGeometry(second, now);
+            if (firstGeometry.width <= 0 || firstGeometry.height <= 0 || secondGeometry.width <= 0 || secondGeometry.height <= 0) {
+                return null;
+            }
+
+            const axes = [
+                [firstGeometry.axisXx, firstGeometry.axisXy],
+                [firstGeometry.axisYx, firstGeometry.axisYy],
+                [secondGeometry.axisXx, secondGeometry.axisXy],
+                [secondGeometry.axisYx, secondGeometry.axisYy]
+            ];
+            const centerDeltaX = secondGeometry.centerX - firstGeometry.centerX;
+            const centerDeltaY = secondGeometry.centerY - firstGeometry.centerY;
+            let minimumOverlap = Infinity;
+            let normalX = 0;
+            let normalY = 0;
+
+            for (const [axisX, axisY] of axes) {
+                const firstProjection = projectDominoGeometryOntoAxis(firstGeometry, axisX, axisY);
+                const secondProjection = projectDominoGeometryOntoAxis(secondGeometry, axisX, axisY);
+                const overlap = Math.min(firstProjection.max, secondProjection.max) - Math.max(firstProjection.min, secondProjection.min);
+
+                if (overlap <= 0) {
+                    return null;
+                }
+
+                if (overlap < minimumOverlap) {
+                    const axisDirection = ((centerDeltaX * axisX) + (centerDeltaY * axisY)) < 0 ? -1 : 1;
+                    minimumOverlap = overlap;
+                    normalX = axisX * axisDirection;
+                    normalY = axisY * axisDirection;
+                }
+            }
+
+            return {
+                overlap: minimumOverlap,
+                normalX,
+                normalY
+            };
+        }
+
+        function resetInputState() {
+            baselineX = null;
+            baselineY = null;
+            baselineBeta = null;
+            baselineGamma = null;
+            latestOrientationBeta = null;
+            latestOrientationGamma = null;
+            motionSampleCount = 0;
+            orientationSampleCount = 0;
+            activeInputMode = 'none';
+            pointerControlActive = false;
+            pointerControlId = null;
+            mouseOriginCaptured = false;
+            pointerAnchorX = 0;
+            pointerAnchorY = 0;
+            hideMouseOriginCrosshair();
+            ax = 0;
+            ay = 0;
+        }
+
+        function resetDesktopMouseOrigin() {
+            if (!shouldUseKeyboardPrompt()) return;
+            mouseOriginCaptured = false;
+            pointerControlActive = false;
+            pointerControlId = null;
+            pointerAnchorX = 0;
+            pointerAnchorY = 0;
+            ax = 0;
+            ay = 0;
+            hideMouseOriginCrosshair();
+        }
+
+        function resetMobileControlOrigin() {
+            if (shouldUseKeyboardPrompt()) return;
+            baselineX = null;
+            baselineY = null;
+            baselineBeta = null;
+            baselineGamma = null;
+            latestOrientationBeta = null;
+            latestOrientationGamma = null;
+            motionSampleCount = 0;
+            orientationSampleCount = 0;
+            activeInputMode = 'none';
+            pointerControlActive = false;
+            pointerControlId = null;
+            pointerAnchorX = 0;
+            pointerAnchorY = 0;
+            ax = 0;
+            ay = 0;
+        }
+
+        function handleWindowBlur() {
+            if (!shouldUseKeyboardPrompt() || !isPlaying || isPaused) return;
+            wasAutoPausedOnBlur = true;
+            isPaused = true;
+            beginGameplayPause(performance.now());
+            applyPauseState();
+        }
+
+        function handleWindowFocus() {
+            if (!shouldUseKeyboardPrompt() || !wasAutoPausedOnBlur || !isPlaying || !isPaused) return;
+            wasAutoPausedOnBlur = false;
+            resetDesktopMouseOrigin();
+            resumeGameplayPause(performance.now());
+            isPaused = false;
+            applyPauseState();
+        }
+
+        function resetTrail() {
+            trailHistory.length = 0;
+            for (const node of trailNodes) {
+                node.style.opacity = '0';
+                node.style.transform = 'translate(-9999px, -9999px) scale(0.7)';
+            }
+        }
+
+        function updateTrail(now = performance.now()) {
+            if (!isPlaying && !isFalling) {
+                resetTrail();
+                return;
+            }
+
+            trailHistory.unshift({ x, y, scale: getBallVisualScale(now) });
+            const maxTrailHistory = trailLength * trailHistoryStep;
+            if (trailHistory.length > maxTrailHistory) {
+                trailHistory.length = maxTrailHistory;
+            }
+
+            const speed = Math.hypot(vx, vy);
+            const speedOpacity = Math.min(0.36 + speed / 18, 0.72);
+            for (let i = 0; i < trailNodes.length; i++) {
+                const node = trailNodes[i];
+                const point = trailHistory[Math.min(i * trailHistoryStep, trailHistory.length - 1)];
+                if (!point) {
+                    node.style.opacity = '0';
+                    continue;
+                }
+
+                const opacity = Math.max(0, speedOpacity * (1 - i / trailNodes.length) * (isFalling ? 0.7 : 1));
+                const scale = Math.max(0.2, point.scale * (1 - i * 0.05));
+                node.style.opacity = opacity.toFixed(3);
+                node.style.transform = `translate(${point.x}px, ${point.y}px) scale(${scale})`;
+            }
+        }
+
+        function clearParticles() {
+            while (particles.length) {
+                const particle = particles.pop();
+                particle.element.remove();
+            }
+        }
+
+        function getMultiplierWord(count) {
+            switch (count) {
+                case 2:
+                    return 'Double';
+                case 3:
+                    return 'Triple';
+                case 4:
+                    return 'Quadruple';
+                case 5:
+                    return 'Quintuple';
+                case 6:
+                    return 'Sextuple';
+                default:
+                    return `${count}x`;
+            }
+        }
+
+        function clearBallCallout() {
+            activeBallCallout = null;
+            ballCallout.style.opacity = '0';
+            ballCallout.style.transform = 'translate(-9999px, -9999px)';
+        }
+
+        function showBallCallout(text, now, durationMs = ballCalloutDurationMs) {
+            ballCallout.textContent = text;
+            const calloutScale = Math.max(0.68, getPlayfieldScale(now));
+            const offsetX = 40 * calloutScale;
+            const offsetY = -30 * calloutScale;
+            const scaledWidth = ballCallout.offsetWidth * calloutScale;
+            const preferredRightX = x + offsetX;
+            const calloutX = preferredRightX + scaledWidth > width - 24
+                ? Math.max(24, x - offsetX - scaledWidth)
+                : Math.max(24, Math.min(width - 24 - scaledWidth, preferredRightX));
+            const calloutY = Math.max(24, Math.min(height - 24, y + offsetY));
+            activeBallCallout = {
+                text,
+                startedAt: now,
+                durationMs,
+                x: calloutX,
+                y: calloutY,
+                scale: calloutScale
+            };
+            updateBallCallout(now);
+        }
+
+        function updateBallCallout(now = performance.now()) {
+            if (!activeBallCallout) return;
+
+            const elapsed = now - activeBallCallout.startedAt;
+            if (elapsed >= activeBallCallout.durationMs) {
+                clearBallCallout();
+                return;
+            }
+
+            const fadeIn = Math.min(1, elapsed / 120);
+            const fadeOut = Math.min(1, (activeBallCallout.durationMs - elapsed) / 220);
+            const opacity = Math.min(fadeIn, fadeOut);
+
+            ballCallout.style.opacity = opacity.toFixed(3);
+            ballCallout.style.transform = `translate(${activeBallCallout.x}px, ${activeBallCallout.y}px) scale(${activeBallCallout.scale.toFixed(3)})`;
+        }
+
+        function registerDominoHit(domino, now) {
+            if (!domino) return;
+            if ((domino.lastHitAt ?? -Infinity) + dominoHitCooldownMs > now) return;
+
+            domino.lastHitAt = now;
+            domino.hitCount = (domino.hitCount || 0) + 1;
+            if (domino.hitCount >= 2) {
+                showBallCallout(`${getMultiplierWord(domino.hitCount)} hit!`, now, 820);
+            }
+        }
+
+        function getWallKnockStrength(domino, hitRect, wallAxis) {
+            if (!domino || !hitRect) return 0;
+
+            const baseSize = Math.max(1, getBlockSize());
+            const wallNormalSpeed = wallAxis === 'x'
+                ? Math.abs(domino.vx)
+                : Math.abs(domino.vy);
+            const recentAcceleration = Math.max(0, domino.recentAcceleration || 0);
+            const sizeFactor = Math.max(
+                0.35,
+                Math.min(1.25, Math.sqrt(Math.max(1, (hitRect.shapeWidth ?? hitRect.width) * (hitRect.shapeHeight ?? hitRect.height))) / baseSize)
+            );
+            const speedFactor = Math.max(0, Math.min(1, (wallNormalSpeed - 0.55) / 4.8));
+            const accelerationFactor = Math.max(0, Math.min(1, recentAcceleration / 2.8));
+            const combinedImpact = (speedFactor * 0.7) + (accelerationFactor * 0.3);
+
+            return Math.max(0, Math.min(1, combinedImpact * sizeFactor));
+        }
+
+        function registerWallKnock(domino, hitRect, wallAxis, now) {
+            if (!domino || !hitRect) return;
+            if ((domino.lastWallCalloutAt ?? -Infinity) + wallCalloutCooldownMs > now) return;
+
+            const strength = getWallKnockStrength(domino, hitRect, wallAxis);
+            if (strength < 0.12) return;
+
+            domino.lastWallCalloutAt = now;
+            shrinkPausedUntil = Math.max(shrinkPausedUntil, now + blockKnockShrinkPauseMs);
+            showBallCallout('Wall knock!', now, 760);
+            expandPlayfieldOnWallKnock(now, strength);
+        }
+
+        function registerDominoCallout(now, addedCount = 1) {
+            if (addedCount <= 0) return;
+
+            if (lastDominoCalloutAt + dominoCalloutChainWindowMs >= now) {
+                dominoCalloutCount += addedCount;
+            } else {
+                dominoCalloutCount = addedCount;
+            }
+
+            lastDominoCalloutAt = now;
+            showBallCallout(
+                dominoCalloutCount === 1 ? 'Domino!' : `${getMultiplierWord(dominoCalloutCount)} Domino!`,
+                now,
+                860
+            );
+        }
+
+        function emitParticles(originX, originY, strength = 1) {
+            const count = Math.max(3, Math.round(3 + strength * 4));
+            for (let i = 0; i < count; i++) {
+                if (particles.length > 64) {
+                    const oldest = particles.shift();
+                    oldest.element.remove();
+                }
+
+                const element = document.createElement('div');
+                element.className = 'impactParticle';
+                element.style.background = currentTheme.particleColors[i % currentTheme.particleColors.length];
+                const size = 6 + Math.random() * 8 * strength;
+                element.style.width = `${size}px`;
+                element.style.height = `${size}px`;
+                element.style.marginLeft = `${-size / 2}px`;
+                element.style.marginTop = `${-size / 2}px`;
+                particleContainer.appendChild(element);
+
+                const angle = Math.random() * Math.PI * 2;
+                const speed = 1.2 + Math.random() * 3.6 * strength;
+                particles.push({
+                    x: originX,
+                    y: originY,
+                    vx: Math.cos(angle) * speed,
+                    vy: Math.sin(angle) * speed,
+                    life: 1,
+                    decay: 0.03 + Math.random() * 0.025,
+                    element
+                });
+            }
+        }
+
+        function updateParticles() {
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const particle = particles[i];
+                particle.x += particle.vx;
+                particle.y += particle.vy;
+                particle.vx *= 0.97;
+                particle.vy *= 0.97;
+                particle.life -= particle.decay;
+
+                if (particle.life <= 0) {
+                    particle.element.remove();
+                    particles.splice(i, 1);
+                    continue;
+                }
+
+                particle.element.style.opacity = particle.life.toFixed(3);
+                particle.element.style.transform = `translate(${particle.x}px, ${particle.y}px) scale(${0.6 + particle.life * 0.8})`;
+            }
+        }
+
+        function clamp01(value) {
+            return Math.max(0, Math.min(1, value));
+        }
+
+        function hasSolidDominoBetweenBallAndEdge(direction, now, bounds, corridorHalfWidth = getBallRadius(now) + 12) {
+            for (const domino of dominoes) {
+                if (!isDominoSolid(domino, now)) continue;
+
+                const hitRect = getDominoHitRect(domino, now);
+                const overlapsVerticalLane = hitRect.y < y + corridorHalfWidth && hitRect.y + hitRect.height > y - corridorHalfWidth;
+                const overlapsHorizontalLane = hitRect.x < x + corridorHalfWidth && hitRect.x + hitRect.width > x - corridorHalfWidth;
+
+                if (direction === 'top') {
+                    if (overlapsHorizontalLane && hitRect.y + hitRect.height >= bounds.top && hitRect.y + hitRect.height <= y) {
+                        return true;
+                    }
+                } else if (direction === 'right') {
+                    if (overlapsVerticalLane && hitRect.x >= x && hitRect.x <= bounds.right) {
+                        return true;
+                    }
+                } else if (direction === 'bottom') {
+                    if (overlapsHorizontalLane && hitRect.y >= y && hitRect.y <= bounds.bottom) {
+                        return true;
+                    }
+                } else if (direction === 'left') {
+                    if (overlapsVerticalLane && hitRect.x + hitRect.width >= bounds.left && hitRect.x + hitRect.width <= x) {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+
+        function getEdgeDangerState(now = performance.now()) {
+            const bounds = getPlayfieldBounds(now);
+            const ballRadius = getBallRadius(now);
+            const distances = {
+                top: Math.max(0, (y - ballRadius) - bounds.top),
+                right: Math.max(0, bounds.right - (x + ballRadius)),
+                bottom: Math.max(0, bounds.bottom - (y + ballRadius)),
+                left: Math.max(0, (x - ballRadius) - bounds.left)
+            };
+            const towardEdgeSpeeds = {
+                top: Math.max(0, -vy),
+                right: Math.max(0, vx),
+                bottom: Math.max(0, vy),
+                left: Math.max(0, -vx)
+            };
+            const blockers = {
+                top: hasSolidDominoBetweenBallAndEdge('top', now, bounds),
+                right: hasSolidDominoBetweenBallAndEdge('right', now, bounds),
+                bottom: hasSolidDominoBetweenBallAndEdge('bottom', now, bounds),
+                left: hasSolidDominoBetweenBallAndEdge('left', now, bounds)
+            };
+            const danger = {};
+
+            for (const direction of ['top', 'right', 'bottom', 'left']) {
+                const distance = distances[direction];
+                const speed = towardEdgeSpeeds[direction];
+                const proximityDanger = clamp01(1 - (distance / edgeDangerDistancePx));
+                let projectedDanger = 0;
+
+                if (!blockers[direction] && speed > edgeDangerSpeedFloor && distance <= edgeDangerProjectionDistancePx) {
+                    const speedFactor = clamp01((speed - edgeDangerSpeedFloor) / (edgeDangerSpeedCeiling - edgeDangerSpeedFloor));
+                    const framesToEdge = distance / Math.max(speed, 0.0001);
+                    const timeFactor = clamp01(1 - (framesToEdge / edgeDangerProjectionFrames));
+                    projectedDanger = speedFactor * timeFactor;
+                }
+
+                danger[direction] = Math.max(proximityDanger, projectedDanger);
+            }
+
+            return { bounds, danger };
+        }
+
+
+        function applyEdgeThreatOpacity() {
+            edgeThreatTop.style.opacity = Math.pow(clamp01(currentBorderDangerFade.top || 0), 0.8).toFixed(3);
+            edgeThreatRight.style.opacity = Math.pow(clamp01(currentBorderDangerFade.right || 0), 0.8).toFixed(3);
+            edgeThreatBottom.style.opacity = Math.pow(clamp01(currentBorderDangerFade.bottom || 0), 0.8).toFixed(3);
+            edgeThreatLeft.style.opacity = Math.pow(clamp01(currentBorderDangerFade.left || 0), 0.8).toFixed(3);
+        }
+
+        function updateEdgeGlow(now = performance.now()) {
+            const { danger, bounds } = getEdgeDangerState(now);
+
+            edgeGlowTop.style.opacity = '0';
+            edgeGlowRight.style.opacity = '0';
+            edgeGlowBottom.style.opacity = '0';
+            edgeGlowLeft.style.opacity = '0';
+
+            const ballRadius = getBallRadius(now);
+            const fallingOutside = isFalling ? {
+                top: (y - ballRadius) <= bounds.top,
+                right: (x + ballRadius) >= bounds.right,
+                bottom: (y + ballRadius) >= bounds.bottom,
+                left: (x - ballRadius) <= bounds.left
+            } : null;
+
+            for (const direction of ['top', 'right', 'bottom', 'left']) {
+                const targetFadeProgress = fallingOutside && fallingOutside[direction]
+                    ? 1
+                    : clamp01((danger[direction] - edgeDangerWholeBorderFadeStart) / (edgeDangerWholeBorderFadeEnd - edgeDangerWholeBorderFadeStart));
+                if (fallingOutside && fallingOutside[direction]) {
+                    currentBorderDangerFade[direction] = 1;
+                } else {
+                    const fadeStep = targetFadeProgress > currentBorderDangerFade[direction]
+                        ? 0.55
+                        : edgeDangerFadeInPerFrame;
+                    currentBorderDangerFade[direction] += (targetFadeProgress - currentBorderDangerFade[direction]) * fadeStep;
+                    currentBorderDangerFade[direction] = clamp01(currentBorderDangerFade[direction]);
+                }
+            }
+            applyPlayfieldBorderThreatOpacity(now);
+
+            edgeThreatTop.style.opacity = Math.pow(clamp01(currentBorderDangerFade.top || 0), 0.8).toFixed(3);
+            edgeThreatRight.style.opacity = Math.pow(clamp01(currentBorderDangerFade.right || 0), 0.8).toFixed(3);
+            edgeThreatBottom.style.opacity = Math.pow(clamp01(currentBorderDangerFade.bottom || 0), 0.8).toFixed(3);
+            edgeThreatLeft.style.opacity = Math.pow(clamp01(currentBorderDangerFade.left || 0), 0.8).toFixed(3);
+        }
+
+        function clearEdgeGlow(snap = false) {
+            edgeGlowTop.style.opacity = '0';
+            edgeGlowRight.style.opacity = '0';
+            edgeGlowBottom.style.opacity = '0';
+            edgeGlowLeft.style.opacity = '0';
+            for (const direction of ['top', 'right', 'bottom', 'left']) {
+                if (gameOverTransparentBorders[direction]) {
+                    currentBorderDangerFade[direction] = 1;
+                } else if (snap) {
+                    currentBorderDangerFade[direction] = 0;
+                } else {
+                    currentBorderDangerFade[direction] += (0 - currentBorderDangerFade[direction]) * edgeDangerClearPerFrame;
+                    currentBorderDangerFade[direction] = clamp01(currentBorderDangerFade[direction]);
+                }
+            }
+            applyPlayfieldBorderThreatOpacity();
+            applyEdgeThreatOpacity();
+        }
+
+        function updateTransitionFlash() {
+            if (transitionFlashOpacity > 0.002) {
+                transitionFlashOpacity *= 0.88;
+                transitionFlash.style.opacity = transitionFlashOpacity.toFixed(3);
+            } else {
+                transitionFlashOpacity = 0;
+                transitionFlash.style.opacity = '0';
+            }
+        }
+
+        function isSensorActive() {
+            return motionSampleCount > 0 || orientationSampleCount > 0;
+        }
+
+        function getRestartCopy(isFirstLaunch) {
+            if (shouldUseKeyboardPrompt()) {
+                return isFirstLaunch ? 'click to start' : 'click to restart';
+            }
+            
+            let text = isFirstLaunch
+                ? 'tap anywhere to start'
+                : 'tap anywhere to restart';
+                
+            if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function' && !motionPermissionGranted) {
+                text += '<br><span style="font-size: 0.85em; opacity: 0.75;">and click Allow if prompted</span>';
+            }
+            
+            return text;
+        }
+
+        function getIntroCopy() {
+            return shouldUseKeyboardPrompt()
+                ? "slowly move mouse to knock all blocks<br>but don't fall off the board"
+                : "lightly tilt phone to knock all blocks<br>but don't fall off the board";
+        }
+
+        function isStandaloneDisplayMode() {
+            return window.matchMedia('(display-mode: standalone)').matches ||
+                window.matchMedia('(display-mode: fullscreen)').matches ||
+                window.navigator.standalone === true;
+        }
+
+        function shouldUseKeyboardPrompt() {
+            return window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+        }
+
+        function clearStartInputTimeout() {
+            if (startInputTimeoutId !== null) {
+                clearTimeout(startInputTimeoutId);
+                startInputTimeoutId = null;
+            }
+        }
+
+        function armStartInput(delay = 0) {
+            clearStartInputTimeout();
+            const arm = () => {
+                awaitingStartInput = true;
+            };
+
+            if (delay > 0) {
+                startInputTimeoutId = setTimeout(() => {
+                    startInputTimeoutId = null;
+                    arm();
+                }, delay);
+            } else {
+                arm();
+            }
+        }
+
+        async function handleStartInput(event) {
+            if (!awaitingStartInput) return;
+            awaitingStartInput = false;
+            clearStartInputTimeout();
+
+            initAudio();
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+
+            ensureMotionListener();
+            ensureOrientationListener();
+            await requestMotionAccess();
+            startGame();
+        }
+
+        function ensureMotionListener() {
+            if (motionListenerAttached) return;
+            window.addEventListener('devicemotion', handleDeviceMotion);
+            motionListenerAttached = true;
+        }
+
+        function ensureOrientationListener() {
+            if (orientationListenerAttached) return;
+            window.addEventListener('deviceorientation', handleDeviceOrientation);
+            orientationListenerAttached = true;
+        }
+
+        function normalizeScreenAngle(angle) {
+            if (!Number.isFinite(angle)) return 0;
+            return ((Math.round(angle / 90) * 90) % 360 + 360) % 360;
+        }
+
+        function getScreenOrientationAngle() {
+            const orientationAngle = Number(window.screen?.orientation?.angle);
+            if (Number.isFinite(orientationAngle)) {
+                return normalizeScreenAngle(orientationAngle);
+            }
+
+            const legacyAngle = Number(window.orientation);
+            if (Number.isFinite(legacyAngle)) {
+                return normalizeScreenAngle(legacyAngle);
+            }
+
+            return viewportWidth > viewportHeight ? 90 : 0;
+        }
+
+        function rotatePortraitTiltToViewport(tiltX, tiltY) {
+            switch (getScreenOrientationAngle()) {
+                case 90:
+                    return { x: tiltY, y: -tiltX };
+                case 180:
+                    return { x: -tiltX, y: -tiltY };
+                case 270:
+                    return { x: -tiltY, y: tiltX };
+                default:
+                    return { x: tiltX, y: tiltY };
+            }
+        }
+
+        function getOrientationFacingMultiplier(beta, gamma) {
+            if (!Number.isFinite(beta)) return null;
+            const betaRadians = beta * Math.PI / 180;
+            const gammaRadians = (Number.isFinite(gamma) ? gamma : 0) * Math.PI / 180;
+            return Math.cos(betaRadians) * Math.cos(gammaRadians) < -0.25 ? -1 : 1;
+        }
+
+        function getMotionFacingMultiplier(z) {
+            const orientationFacingMultiplier = getOrientationFacingMultiplier(latestOrientationBeta, latestOrientationGamma);
+            if (orientationFacingMultiplier !== null) {
+                return orientationFacingMultiplier;
+            }
+
+            return Number.isFinite(z) && z < -1 ? -1 : 1;
+        }
+
+        function handleDeviceMotion(event) {
+            if (!isPlaying || isPaused) return;
+            const acceleration = event.accelerationIncludingGravity;
+            const hasSample = acceleration && [acceleration.x, acceleration.y, acceleration.z].some(value => Number.isFinite(value));
+            if (!hasSample) return;
+
+            const rx = acceleration.x || 0;
+            const ry = acceleration.y || 0;
+            if (baselineX === null) {
+                baselineX = rx;
+                baselineY = ry;
+            }
+            motionSampleCount++;
+            activeInputMode = 'motion';
+            const facingMultiplier = getMotionFacingMultiplier(acceleration.z);
+            const viewportTilt = rotatePortraitTiltToViewport(
+                (rx - baselineX) * facingMultiplier,
+                -(ry - baselineY) * facingMultiplier
+            );
+            ax = viewportTilt.x * 0.4;
+            ay = viewportTilt.y * 0.4;
+        }
+
+        function handleDeviceOrientation(event) {
+            if (!Number.isFinite(event.beta) || !Number.isFinite(event.gamma)) return;
+            latestOrientationBeta = event.beta;
+            latestOrientationGamma = event.gamma;
+            if (!isPlaying || isPaused || activeInputMode === 'motion') return;
+
+            if (baselineBeta === null) {
+                baselineBeta = event.beta;
+                baselineGamma = event.gamma;
+            }
+
+            orientationSampleCount++;
+            activeInputMode = 'orientation';
+            const facingMultiplier = getOrientationFacingMultiplier(event.beta, event.gamma) ?? 1;
+            const viewportTilt = rotatePortraitTiltToViewport(
+                (event.gamma - baselineGamma) * facingMultiplier,
+                (event.beta - baselineBeta) * facingMultiplier
+            );
+            ax = viewportTilt.x * 0.06;
+            ay = viewportTilt.y * 0.06;
+        }
+
+        async function requestMotionAccess() {
+            const requests = [];
+
+            if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+                requests.push(DeviceMotionEvent.requestPermission().catch(() => 'denied'));
+            }
+
+            if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+                requests.push(DeviceOrientationEvent.requestPermission().catch(() => 'denied'));
+            }
+
+            if (!requests.length) {
+                motionPermissionGranted = true;
+                return true;
+            }
+
+            const results = await Promise.all(requests);
+            const granted = results.includes('granted');
+            if (granted) {
+                motionPermissionGranted = true;
+            }
+            return granted;
+        }
+
+        function handlePointerControlStart(event) {
+            if (!isPlaying || isPaused || isSensorActive()) return;
+            if (shouldUseKeyboardPrompt()) return;
+            pointerControlActive = true;
+            pointerControlId = event.pointerId;
+            pointerAnchorX = event.clientX;
+            pointerAnchorY = event.clientY;
+            gameArea.setPointerCapture?.(event.pointerId);
+        }
+
+        function handlePointerControlMove(event) {
+            if (isSensorActive() || !isPlaying || isPaused) return;
+            if (!shouldUseKeyboardPrompt() && (!pointerControlActive || pointerControlId !== event.pointerId)) return;
+            if (shouldUseKeyboardPrompt() && !mouseOriginCaptured) {
+                pointerAnchorX = event.clientX;
+                pointerAnchorY = event.clientY;
+                mouseOriginCaptured = true;
+                showMouseOriginCrosshair();
+            }
+            updateMouseOriginLine(event.clientX, event.clientY);
+            const dx = event.clientX - pointerAnchorX;
+            const dy = event.clientY - pointerAnchorY;
+            const controlRange = shouldUseKeyboardPrompt() ? mouseControlRange : 140;
+            const accelerationStrength = shouldUseKeyboardPrompt() ? getDesktopMouseAccelerationStrength() : 0.35;
+            ax = clampValue(dx / controlRange, 2.5) * accelerationStrength;
+            ay = clampValue(dy / controlRange, 2.5) * accelerationStrength;
+            pointerControlActive = true;
+            activeInputMode = 'pointer';
+        }
+
+        function handlePointerControlEnd(event) {
+            if (pointerControlId !== null && event.pointerId !== undefined && pointerControlId !== event.pointerId) return;
+            if (shouldUseKeyboardPrompt()) return;
+            pointerControlActive = false;
+            pointerControlId = null;
+            if (!isSensorActive()) {
+                ax = 0;
+                ay = 0;
+            }
+        }
+
+        function spawnBlocks(targetLevel) {
+            dominoContainer.innerHTML = '';
+            dominoes = [];
+            dominoCalloutCount = 0;
+            lastDominoCalloutAt = -Infinity;
+            clearBallCallout();
+            const size = getBlockSize();
+            const count = getBlockCountForLevel(targetLevel);
+            const bounds = getPlayfieldBounds();
+            const spawnWidth = bounds.right - bounds.left;
+            const spawnHeight = bounds.bottom - bounds.top;
+
+            for (let i = 0; i < count; i++) {
+                let rx;
+                let ry;
+                let overlap = true;
+
+                while (overlap) {
+                    rx = bounds.left + Math.random() * Math.max(spawnWidth - size, 1);
+                    ry = bounds.top + Math.random() * Math.max(spawnHeight - size, 1);
+                    overlap = Math.hypot(rx - x, ry - y) <= 120;
+
+                    if (!overlap) {
+                        for (const domino of dominoes) {
+                            if (rx < domino.x + size && rx + size > domino.x && ry < domino.y + size && ry + size > domino.y) {
+                                overlap = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                const element = document.createElement('div');
+                element.className = 'domino';
+                element.style.width = size + 'px';
+                element.style.height = size + 'px';
+                dominoContainer.appendChild(element);
+                dominoes.push({
+                    x: rx,
+                    y: ry,
+                    width: size,
+                    height: size,
+                    vx: 0,
+                    vy: 0,
+                    previousVx: 0,
+                    previousVy: 0,
+                    recentAcceleration: 0,
+                    angle: 0,
+                    angularVelocity: 0,
+                    hitCount: 0,
+                    lastHitAt: -Infinity,
+                    lastWallCalloutAt: -Infinity,
+                    knocked: false,
+                    knockedAt: null,
+                    repositionUntil: null,
+                    removeAt: null,
+                    element
+                });
+            }
+        }
+
+        function checkCollisions(now, ballRadius) {
+            for (const domino of dominoes) {
+                if (!isDominoSolid(domino, now)) continue;
+
+                const collision = getBallDominoCollision(domino, now, x, y, ballRadius);
+                if (!collision) continue;
+
+                playSound(400, 0.05, 0.08);
+                const wasKnocked = domino.knocked;
+                const impactSpeed = Math.hypot(vx, vy);
+                if (impactSpeed > 0.75) {
+                    registerDominoHit(domino, now);
+                }
+                markDominoKnocked(domino, now);
+
+                x += collision.normalX * collision.overlap;
+                y += collision.normalY * collision.overlap;
+
+                domino.angularVelocity += ((x - collision.centerX) * vy - (y - collision.centerY) * vx) * angularImpactStrength;
+                domino.vx += vx * 0.6;
+                domino.vy += vy * 0.6;
+                clampDominoMotion(domino);
+                if (impactSpeed > 1.8) {
+                    emitParticles(collision.contactX, collision.contactY, Math.min(1.4, impactSpeed / 10 + (wasKnocked ? 0 : 0.35)));
+                    triggerTransitionFlash(0.1);
+                }
+
+                const velocityAlongNormal = (vx * collision.normalX) + (vy * collision.normalY);
+                if (velocityAlongNormal < 0) {
+                    vx -= (1 + dampening) * velocityAlongNormal * collision.normalX;
+                    vy -= (1 + dampening) * velocityAlongNormal * collision.normalY;
+                }
+            }
+
+            for (let i = 0; i < dominoes.length; i++) {
+                for (let j = i + 1; j < dominoes.length; j++) {
+                    const first = dominoes[i];
+                    const second = dominoes[j];
+                    if (!isDominoSolid(first, now) || !isDominoSolid(second, now)) continue;
+                    const collision = getDominoDominoCollision(first, second, now);
+                    if (!collision) continue;
+
+                    playSound(300, 0.03, 0.08);
+                    const firstWasKnocked = first.knocked;
+                    const secondWasKnocked = second.knocked;
+                    const collisionImpact = Math.hypot(first.vx - second.vx, first.vy - second.vy);
+                    const separation = collision.overlap / 2;
+                    const tangentX = -collision.normalY;
+                    const tangentY = collision.normalX;
+
+                    first.x -= collision.normalX * separation;
+                    first.y -= collision.normalY * separation;
+                    second.x += collision.normalX * separation;
+                    second.y += collision.normalY * separation;
+
+                    const firstNormalSpeed = (first.vx * collision.normalX) + (first.vy * collision.normalY);
+                    const secondNormalSpeed = (second.vx * collision.normalX) + (second.vy * collision.normalY);
+                    const relativeNormalSpeed = secondNormalSpeed - firstNormalSpeed;
+
+                    if (relativeNormalSpeed < 0) {
+                        const restitution = 0.82;
+                        const firstTangentSpeed = (first.vx * tangentX) + (first.vy * tangentY);
+                        const secondTangentSpeed = (second.vx * tangentX) + (second.vy * tangentY);
+                        const newFirstNormalSpeed = secondNormalSpeed * restitution;
+                        const newSecondNormalSpeed = firstNormalSpeed * restitution;
+
+                        first.vx = (tangentX * firstTangentSpeed) + (collision.normalX * newFirstNormalSpeed);
+                        first.vy = (tangentY * firstTangentSpeed) + (collision.normalY * newFirstNormalSpeed);
+                        second.vx = (tangentX * secondTangentSpeed) + (collision.normalX * newSecondNormalSpeed);
+                        second.vy = (tangentY * secondTangentSpeed) + (collision.normalY * newSecondNormalSpeed);
+
+                        const tangentialSlip = secondTangentSpeed - firstTangentSpeed;
+                        first.angularVelocity = clampValue(first.angularVelocity + (tangentialSlip * 0.02), maxAngularVelocity);
+                        second.angularVelocity = clampValue(second.angularVelocity - (tangentialSlip * 0.02), maxAngularVelocity);
+                    }
+
+                    first.angularVelocity = clampValue(first.angularVelocity * 0.92, maxAngularVelocity);
+                    second.angularVelocity = clampValue(second.angularVelocity * 0.92, maxAngularVelocity);
+                    clampDominoMotion(first);
+                    clampDominoMotion(second);
+
+                    if (collisionImpact > 0.75) {
+                        registerDominoHit(first, now);
+                        registerDominoHit(second, now);
+                    }
+
+                    if (first.knocked || second.knocked) {
+                        markDominoKnocked(first, now);
+                        markDominoKnocked(second, now);
+                        if (collisionImpact > 0.75) {
+                            const newDominoKnocks = (firstWasKnocked ? 0 : 1) + (secondWasKnocked ? 0 : 1);
+                            if (newDominoKnocks > 0 && (firstWasKnocked || secondWasKnocked)) {
+                                registerDominoCallout(now, newDominoKnocks);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        function beginFall() {
+            gameOverTransparentBorders.top = false;
+            gameOverTransparentBorders.right = false;
+            gameOverTransparentBorders.bottom = false;
+            gameOverTransparentBorders.left = false;
+            isPlaying = false;
+            isFalling = true;
+            isPaused = false;
+            pauseStartedAt = null;
+            wasAutoPausedOnBlur = false;
+            isLevelingUp = false;
+            hideMouseOriginCrosshair();
+            clearPendingLevelAdvance();
+            clearBallCallout();
+            setShrinkWarningTone(false);
+            applyPauseState();
+        }
+
+        function finishRound() {
+            const finishNow = performance.now();
+            const finishBounds = getPlayfieldBounds(finishNow);
+            const finishBallRadius = getBallRadius(finishNow);
+            gameOverTransparentBorders.top = (y - finishBallRadius) <= finishBounds.top;
+            gameOverTransparentBorders.right = (x + finishBallRadius) >= finishBounds.right;
+            gameOverTransparentBorders.bottom = (y + finishBallRadius) >= finishBounds.bottom;
+            gameOverTransparentBorders.left = (x - finishBallRadius) <= finishBounds.left;
+            isPlaying = false;
+            isFalling = false;
+            isPaused = false;
+            pauseStartedAt = null;
+            wasAutoPausedOnBlur = false;
+            isLevelingUp = false;
+            isShowingGameOver = true;
+            awaitingStartInput = false;
+            clearPendingLevelAdvance();
+            clearStartInputTimeout();
+            setShrinkWarningTone(false);
+            if (levelGrowAnimation?.source === 'wall_knock') {
+                const stabilizedScale = Math.min(1, getPlayfieldScale(finishNow));
+                if (playfieldScale > 0 && Math.abs(stabilizedScale - playfieldScale) > 0.000001) {
+                    applyPlayfieldScaleRatio(stabilizedScale / playfieldScale);
+                }
+                levelGrowAnimation = null;
+                playfieldScale = stabilizedScale;
+                lastPlayfieldScaleUpdateAt = finishNow;
+                updatePlayfieldFrame(finishNow);
+            }
+
+            if (rollGain) {
+                rollGain.gain.setTargetAtTime(0, audioCtx.currentTime, 0.1);
+            }
+
+            const madeNewBest = !currentRunIsPreview && level > bestScore;
+            if (madeNewBest) {
+                bestScore = level;
+                persistBestScore(bestScore);
+            }
+
+            dominoes.forEach(domino => {
+                domino.element.style.opacity = '';
+                domino.element.classList.add('game-over-fade');
+            });
+
+            ball.style.display = 'none';
+            resetTrail();
+            clearParticles();
+            clearBallCallout();
+            clearEdgeGlow(false);
+            startLevelGrowAnimation(finishNow);
+            applyPauseState();
+            introText.style.display = bestScore <= 2 ? 'block' : 'none';
+            updateOverlayTextLayout();
+            restartText.innerHTML = getRestartCopy(false);
+            restartText.style.display = 'block';
+            updateLevelIndicatorState();
+            armStartInput(250);
+        }
+
+        function update() {
+            const now = performance.now();
+            if (isPlaying && !isPaused && !isLevelingUp) {
+                updateIdleCycle(now);
+            }
+            if (!isPaused || !isPlaying) {
+                updateLevelGrowAnimation(now);
+            }
+            if (isPlaying && !isPaused) {
+                updateLevelShrinkCueAudio(now);
+            }
+
+            if (isPlaying && !isPaused) {
+                const ballFriction = getBallFriction();
+                vx += ax;
+                vy += ay;
+                vx *= ballFriction;
+                vy *= ballFriction;
+                x += vx;
+                y += vy;
+
+                const speed = Math.hypot(vx, vy);
+                const ballRadius = getBallRadius(now);
+                const bounds = getPlayfieldBounds(now);
+                if (rollGain) {
+                    const targetGain = isMuted ? 0 : Math.min((speed / 15) * 0.85, 0.765);
+                    rollGain.gain.setTargetAtTime(targetGain, audioCtx.currentTime, 0.1);
+                    rollOsc.frequency.setTargetAtTime(30 + speed * 1.5, audioCtx.currentTime, 0.1);
+                }
+
+                if (!isPointInsidePlayfield(x, y, now)) {
+                    beginFall();
+                } else {
+                    checkCollisions(now, ballRadius);
+                    let unclearedCount = 0;
+
+                    for (let i = dominoes.length - 1; i >= 0; i--) {
+                        const domino = dominoes[i];
+                        if (!domino.knocked) {
+                            unclearedCount++;
+                        } else if (domino.removeAt !== null) {
+                            if (now >= domino.removeAt) {
+                                domino.element.remove();
+                                dominoes.splice(i, 1);
+                                continue;
+                            }
+
+                            domino.element.style.opacity = '1';
+                        }
+
+                        domino.recentAcceleration = Math.hypot(
+                            domino.vx - (domino.previousVx ?? domino.vx),
+                            domino.vy - (domino.previousVy ?? domino.vy)
+                        );
+
+                        const knockProgress = domino.knocked && domino.knockedAt !== null
+                            ? Math.min(1, (now - domino.knockedAt) / knockedBlockLifetimeMs)
+                            : 0;
+                        const knockedMotionDamping = domino.knocked ? 1 - (knockProgress * 0.14) : 1;
+
+                        domino.x += domino.vx * knockedMotionDamping;
+                        domino.y += domino.vy * knockedMotionDamping;
+                        domino.angle += domino.angularVelocity * knockedMotionDamping;
+                        domino.vx *= blockFriction * knockedMotionDamping;
+                        domino.vy *= blockFriction * knockedMotionDamping;
+                        domino.angularVelocity *= angularVelocityDamping * knockedMotionDamping;
+                        clampDominoMotion(domino);
+                        if (domino.angle > 360 || domino.angle < -360) {
+                            domino.angle %= 360;
+                        }
+
+                        const hitRect = getDominoHitRect(domino, now);
+                        if (isDominoSolid(domino, now)) {
+                            if (hitRect.x < bounds.left) {
+                                domino.x += bounds.left - hitRect.x;
+                                domino.vx *= -0.8;
+                                playSound(200, 0.03, 0.1, 'triangle');
+                                registerWallKnock(domino, hitRect, 'x', now);
+                            }
+                            if (hitRect.x + hitRect.width > bounds.right) {
+                                domino.x -= (hitRect.x + hitRect.width) - bounds.right;
+                                domino.vx *= -0.8;
+                                playSound(200, 0.03, 0.1, 'triangle');
+                                registerWallKnock(domino, hitRect, 'x', now);
+                            }
+                            if (hitRect.y < bounds.top) {
+                                domino.y += bounds.top - hitRect.y;
+                                domino.vy *= -0.8;
+                                playSound(200, 0.03, 0.1, 'triangle');
+                                registerWallKnock(domino, hitRect, 'y', now);
+                            }
+                            if (hitRect.y + hitRect.height > bounds.bottom) {
+                                domino.y -= (hitRect.y + hitRect.height) - bounds.bottom;
+                                domino.vy *= -0.8;
+                                playSound(200, 0.03, 0.1, 'triangle');
+                                registerWallKnock(domino, hitRect, 'y', now);
+                            }
+                        } else if (
+                            hitRect.x + hitRect.width < bounds.left - dominoExitBuffer ||
+                            hitRect.x > bounds.right + dominoExitBuffer ||
+                            hitRect.y + hitRect.height < bounds.top - dominoExitBuffer ||
+                            hitRect.y > bounds.bottom + dominoExitBuffer
+                        ) {
+                            domino.element.remove();
+                            dominoes.splice(i, 1);
+                            continue;
+                        }
+
+                        const dominoScale = getDominoScale(domino, now) * getPlayfieldScale(now);
+
+                        domino.element.style.left = domino.x + 'px';
+                        domino.element.style.top = domino.y + 'px';
+                        domino.element.style.transform = `rotate(${domino.angle}deg) scale(${dominoScale.toFixed(3)})`;
+                        domino.previousVx = domino.vx;
+                        domino.previousVy = domino.vy;
+                    }
+
+                    if (unclearedCount === 0 && !isLevelingUp) {
+                        isLevelingUp = true;
+                        clearPendingLevelAdvance();
+                        clearBallCallout();
+                        triggerTransitionFlash(isMilestoneLevel(level + 1) ? 0.42 : 0.26);
+                        levelAdvanceTimeoutId = setTimeout(() => {
+                            levelAdvanceTimeoutId = null;
+                            if (!isPlaying || isFalling) {
+                                isLevelingUp = false;
+                                return;
+                            }
+                            const nextLevelStartAt = performance.now();
+                            level++;
+                            updateLevelIndicatorState();
+                            bumpLevelIndicator();
+                            spawnBlocks(level);
+                            armLevelStartShrinkDelay(level, nextLevelStartAt);
+                            isLevelingUp = false;
+                        }, 1000);
+                    }
+                }
+            }
+
+            if (isFalling && !isPaused) {
+                x += vx * 0.5;
+                y += vy * 0.5;
+                ballScale *= 0.85;
+
+                if (rollGain) {
+                    rollGain.gain.setTargetAtTime(0, audioCtx.currentTime, 0.1);
+                }
+
+                if (ballScale < 0.05) {
+                    finishRound();
+                }
+            }
+
+            updateTrail();
+            updateParticles();
+            updateTransitionFlash();
+            updatePlayfieldFrame(now);
+            updateBallCallout(now);
+            if (isPlaying || isFalling) {
+                updateEdgeGlow(now);
+            } else {
+                clearEdgeGlow(false);
+            }
+
+            if (isPlaying || isFalling || levelGrowAnimation) {
+                ball.style.transform = `translate(${x - radius}px, ${y - radius}px) scale(${getBallVisualScale(now).toFixed(3)})`;
+                animationFrameId = requestAnimationFrame(update);
+            } else {
+                animationFrameId = null;
+            }
+        }
+
+        function startGame() {
+            awaitingStartInput = false;
+            clearStartInputTimeout();
+            clearPendingLevelAdvance();
+            if (animationFrameId !== null) {
+                cancelAnimationFrame(animationFrameId);
+                animationFrameId = null;
+            }
+
+            ensureMotionListener();
+            ensureOrientationListener();
+            updateViewportBounds();
+
+            resetInputState();
+            bestScoreBeforeRun = bestScore;
+            currentRunStartLevel = previewLevel;
+            currentRunIsPreview = previewLevel > 1;
+            level = currentRunStartLevel;
+            x = safeInsets.left + (viewportWidth / 2);
+            y = safeInsets.top + (viewportHeight / 2);
+            vx = 0;
+            vy = 0;
+            ballScale = 1;
+            ball.style.opacity = '1';
+            ball.style.display = 'block';
+            resetTrail();
+            clearParticles();
+            clearBallCallout();
+            setShrinkWarningTone(false);
+            transitionFlashOpacity = 0;
+            transitionFlash.style.opacity = '0';
+            lastGameStartedAt = performance.now();
+
+            isPlaying = true;
+            isFalling = false;
+            isPaused = false;
+            pauseStartedAt = null;
+            wasAutoPausedOnBlur = false;
+            isLevelingUp = false;
+            isShowingGameOver = false;
+            const runStartAt = performance.now();
+            resetIdleShrinkState(runStartAt);
+            armLevelStartShrinkDelay(level, runStartAt);
+
+            applyPauseState();
+            spawnBlocks(level);
+
+            introText.style.display = 'none';
+            restartText.style.display = 'none';
+            updateLevelIndicatorState();
+
+            update();
+        }
+
+        function handleEarlyDeviceMotion(event) {
+            if (event.accelerationIncludingGravity && 
+                Number.isFinite(event.accelerationIncludingGravity.x)) {
+                motionPermissionGranted = true;
+                window.removeEventListener('devicemotion', handleEarlyDeviceMotion);
+                if (restartText && restartText.style.display !== 'none') {
+                    restartText.innerHTML = getRestartCopy(!isShowingGameOver);
+                }
+            }
+        }
+        window.addEventListener('devicemotion', handleEarlyDeviceMotion);
+
+        createTrailNodes();
+        updateViewportBounds();
+
+        ball.style.display = 'block';
+        positionBallAtCenter();
+        introText.style.display = 'block';
+        restartText.style.display = 'block';
+        restartText.innerHTML = getRestartCopy(true);
+        updateLevelIndicatorState();
+        applyPauseState();
+        applyMuteState();
+        armStartInput();
+
+        gameArea.addEventListener('pointerdown', handlePointerControlStart);
+        gameArea.addEventListener('pointermove', handlePointerControlMove);
+        gameArea.addEventListener('pointerup', handlePointerControlEnd);
+        gameArea.addEventListener('pointercancel', handlePointerControlEnd);
+        gameArea.addEventListener('click', handlePlayfieldPauseToggle);
+        gameArea.addEventListener('touchend', handlePlayfieldPauseToggle, { passive: false });
+        window.addEventListener('pointermove', handlePointerControlMove);
+        muteToggle.addEventListener('pointerdown', event => event.stopPropagation());
+        muteToggle.addEventListener('touchend', event => event.stopPropagation());
+        muteToggle.addEventListener('click', event => {
+            event.stopPropagation();
+            toggleMute();
+        });
+        document.addEventListener('click', handleStartInput);
+        document.addEventListener('touchend', handleStartInput);
+
+        window.addEventListener('resize', () => {
+            updateViewportBounds();
+            updateLevelIndicatorState();
+        });
+        window.addEventListener('blur', handleWindowBlur);
+        window.addEventListener('focus', handleWindowFocus);
+        window.addEventListener('orientationchange', () => setTimeout(() => {
+            updateViewportBounds();
+            updateLevelIndicatorState();
+        }, 150));
+    </script>
+</body>
+</html>
