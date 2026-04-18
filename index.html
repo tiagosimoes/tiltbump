@@ -3359,12 +3359,10 @@
 
         function finishRound() {
             const finishNow = performance.now();
-            const finishBounds = getPlayfieldBounds(finishNow);
-            const finishBallRadius = getBallRadius(finishNow);
-            gameOverTransparentBorders.top = (y - finishBallRadius) <= finishBounds.top;
-            gameOverTransparentBorders.right = (x + finishBallRadius) >= finishBounds.right;
-            gameOverTransparentBorders.bottom = (y + finishBallRadius) >= finishBounds.bottom;
-            gameOverTransparentBorders.left = (x - finishBallRadius) <= finishBounds.left;
+            gameOverTransparentBorders.top = false;
+            gameOverTransparentBorders.right = false;
+            gameOverTransparentBorders.bottom = false;
+            gameOverTransparentBorders.left = false;
             isPlaying = false;
             isFalling = false;
             isPaused = false;
@@ -3411,7 +3409,7 @@
             resetTrail();
             clearParticles();
             clearBallCallout();
-            clearEdgeGlow(false);
+            clearEdgeGlow(true);
             startLevelGrowAnimation(finishNow);
             applyPauseState();
             introText.style.display = bestScore <= 2 ? 'block' : 'none';
