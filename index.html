@@ -9,7 +9,7 @@
     <meta name="theme-color" content="#000000">
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="#000000">
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#000000">
-    <title>Gyro</title>
+    <title>tiltbump</title>
     <style>
         :root {
             --safe-top: env(safe-area-inset-top, 0px);
@@ -2531,7 +2531,7 @@
             }
             
             let text = isFirstLaunch
-                ? 'tap anywhere to start'
+                ? 'hold phone still and<br>click to start'
                 : 'tap anywhere to restart';
                 
             if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function' && !motionPermissionGranted) {
