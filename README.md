@@ -2,6 +2,10 @@
 
 A fast, minimalist browser game where you steer a ball by tilting your phone. Knock every block off the board, survive as long as you can, and chase a higher best score each run.
 
+## Demo
+
+[Play the demo](https://tiagosimoes.github.io/tiltbump/)
+
 ## How to play
 
 - **Mobile:** lightly tilt your phone to move the ball
