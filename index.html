@@ -39,6 +39,8 @@
             --knocked-sheen: rgba(255, 255, 255, 0.08);
             --edge-color: rgba(244, 197, 66, 0.34);
             --flash-color: rgba(123, 193, 255, 0.22);
+            --record-color-soft: rgba(241, 196, 15, 0.15);
+            --record-color-solid: rgba(241, 196, 15, 0.92);
         }
 
         html, body {
@@ -113,7 +115,7 @@
         }
 
         #levelIndicator.new-best {
-            color: rgba(241, 196, 15, 0.15);
+            color: var(--record-color-soft);
         }
 
         #levelIndicator.milestone {
@@ -127,7 +129,7 @@
         }
 
         #levelIndicator.game-over.new-best {
-            color: rgb(241, 196, 15);
+            color: var(--record-color-solid);
         }
 
         #levelIndicator.pop {
@@ -551,7 +553,7 @@
         }
 
         #achievementSummary .achievement-line.record {
-            color: rgba(241, 196, 15, 0.92);
+            color: var(--record-color-solid);
         }
 
         #introText {
@@ -573,7 +575,7 @@
         }
 
         #bestScoreDisplay.new-high-score {
-            color: rgba(241, 196, 15, 0.15);
+            color: var(--record-color-soft);
         }
 
         #bestScoreDisplay.game-over {
@@ -582,7 +584,7 @@
         }
 
         #bestScoreDisplay.game-over.new-high-score {
-            color: rgba(241, 196, 15, 0.92);
+            color: var(--record-color-solid);
         }
 
         #restartText {
@@ -1324,6 +1326,8 @@
             rootStyle.setProperty('--knocked-dark', currentTheme.knockedDark);
             rootStyle.setProperty('--edge-color', hexToRgba(currentTheme.blockMid || currentTheme.ballMid, 0.34));
             rootStyle.setProperty('--flash-color', currentTheme.flashColor);
+            rootStyle.setProperty('--record-color-soft', hexToRgba(currentTheme.blockMid || currentTheme.ballMid, 0.15));
+            rootStyle.setProperty('--record-color-solid', hexToRgba(currentTheme.blockMid || currentTheme.ballMid, 0.92));
             document.documentElement.style.backgroundColor = '#000000';
             document.body.style.backgroundColor = '#000000';
             for (const themeColorMeta of themeColorMetas) {
@@ -1512,27 +1516,27 @@
                 {
                     key: 'wallKnocks',
                     count: wallKnockCalloutTotal,
-                    label: `${wallKnockCalloutTotal}x ${pluralizeAchievementLabel(wallKnockCalloutTotal, 'wall knock', 'wall knocks')}!`
+                    label: `${wallKnockCalloutTotal} ${pluralizeAchievementLabel(wallKnockCalloutTotal, 'wall knock', 'wall knocks')}!`
                 },
                 {
                     key: 'doubleHits',
                     count: doubleHitCalloutTotal,
-                    label: `${doubleHitCalloutTotal}x ${pluralizeAchievementLabel(doubleHitCalloutTotal, 'double hit', 'double hits')}!`
+                    label: `${doubleHitCalloutTotal} ${pluralizeAchievementLabel(doubleHitCalloutTotal, 'double hit', 'double hits')}!`
                 },
                 {
                     key: 'dominos',
                     count: dominoCalloutTotal,
-                    label: `${dominoCalloutTotal}x ${pluralizeAchievementLabel(dominoCalloutTotal, 'domino', 'dominos')}!`
+                    label: `${dominoCalloutTotal} ${pluralizeAchievementLabel(dominoCalloutTotal, 'domino', 'dominos')}!`
                 },
                 {
                     key: 'doubleDominos',
                     count: doubleDominoCalloutTotal,
-                    label: `${doubleDominoCalloutTotal}x ${pluralizeAchievementLabel(doubleDominoCalloutTotal, 'double domino', 'double dominos')}!`
+                    label: `${doubleDominoCalloutTotal} ${pluralizeAchievementLabel(doubleDominoCalloutTotal, 'double domino', 'double dominos')}!`
                 },
                 {
                     key: 'combos',
                     count: comboCalloutTotal,
-                    label: `${comboCalloutTotal}x ${pluralizeAchievementLabel(comboCalloutTotal, 'combo', 'combos')}!`
+                    label: `${comboCalloutTotal} ${pluralizeAchievementLabel(comboCalloutTotal, 'combo', 'combos')}!`
                 }
             ].filter(line => line.count > 0);
         }
