@@ -505,7 +505,7 @@
                         inset 2px 2px 4px var(--knocked-sheen);
         }
 
-        #introText, #bestScoreDisplay, #restartText {
+        #introText, #bestScoreDisplay, #restartText, #mobileVersionLinkWrap, #desktopQrPanel {
             position: absolute;
             left: 50%;
             transform: translateX(-50%) scale(var(--overlay-text-scale, 1));
@@ -561,10 +561,102 @@
             white-space: normal;
         }
 
+        #mobileVersionLinkWrap {
+            top: calc(50% + 24vh);
+            top: calc(50% + 24dvh);
+            z-index: 1001;
+            display: none;
+        }
+
+        #mobileVersionLink {
+            pointer-events: auto;
+            appearance: none;
+            border: 0;
+            background: transparent;
+            color: rgba(208, 220, 236, 0.86);
+            font: inherit;
+            font-size: 18px;
+            font-weight: 300;
+            line-height: 1.35;
+            text-decoration: underline;
+            text-underline-offset: 0.18em;
+            cursor: pointer;
+            padding: 0;
+        }
+
+        #mobileVersionLink:hover,
+        #mobileVersionLink:focus-visible {
+            color: rgba(255, 255, 255, 0.98);
+            outline: none;
+        }
+
+        #desktopQrPanel {
+            top: calc(50% + 31vh);
+            top: calc(50% + 31dvh);
+            z-index: 1002;
+            display: none;
+            color: rgba(208, 220, 236, 0.86);
+        }
+
+        #desktopQrCard {
+            pointer-events: auto;
+            display: inline-flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+            padding: 16px;
+            border-radius: 18px;
+            background: rgba(12, 24, 37, 0.72);
+            box-shadow:
+                0 12px 32px rgba(0, 0, 0, 0.36),
+                inset 0 0 0 1px rgba(255, 255, 255, 0.07);
+            text-decoration: none;
+            color: inherit;
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+        }
+
+        #desktopQrCard:hover,
+        #desktopQrCard:focus-visible {
+            box-shadow:
+                0 14px 36px rgba(0, 0, 0, 0.42),
+                inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+            outline: none;
+        }
+
+        #desktopQrImage {
+            width: min(42vw, 180px);
+            height: min(42vw, 180px);
+            border-radius: 12px;
+            background: white;
+            display: block;
+        }
+
+        #desktopQrCaption {
+            font-size: 15px;
+            line-height: 1.35;
+            color: rgba(232, 240, 255, 0.82);
+        }
+
         @media (max-height: 500px) {
             #bestScoreDisplay {
                 top: calc(50% - 15vh);
                 top: calc(50% - 15dvh);
+            }
+
+            #mobileVersionLinkWrap {
+                top: calc(50% + 22vh);
+                top: calc(50% + 22dvh);
+            }
+
+            #desktopQrPanel {
+                top: calc(50% + 28vh);
+                top: calc(50% + 28dvh);
+            }
+
+            #desktopQrImage {
+                width: min(28vw, 132px);
+                height: min(28vw, 132px);
             }
         }
 
@@ -691,6 +783,15 @@
     <div id="introText">lightly tilt phone to knock all blocks<br>but don't fall off the board</div>
     <div id="bestScoreDisplay">Best: 0</div>
     <div id="restartText">tap anywhere to start</div>
+    <div id="desktopQrPanel" aria-hidden="true">
+        <a id="desktopQrCard" href="https://tiagosimoes.github.io/tiltbump/" target="_blank" rel="noopener noreferrer">
+            <img id="desktopQrImage" alt="QR code for the mobile version">
+            <div id="desktopQrCaption">scan to play on your phone</div>
+        </a>
+    </div>
+    <div id="mobileVersionLinkWrap">
+        <button id="mobileVersionLink" type="button">cooler mobile version</button>
+    </div>
     <button id="muteToggle" class="hudIconButton" type="button" aria-pressed="false" aria-label="Mute sound" title="Mute sound">
         <svg class="icon-on" viewBox="0 0 24 24" aria-hidden="true">
             <path d="M5 10h4l5-4v12l-5-4H5z"></path>
@@ -705,6 +806,7 @@
     </button>
 
     <script>
+        const MOBILE_VERSION_URL = 'https://tiagosimoes.github.io/tiltbump/';
         const gameArea = document.getElementById('gameArea');
         const safeAreaProbe = document.getElementById('safeAreaProbe');
         const themeColorMetas = Array.from(document.querySelectorAll('meta[name="theme-color"]'));
@@ -714,6 +816,11 @@
         const restartText = document.getElementById('restartText');
         const introText = document.getElementById('introText');
         const bestScoreDisplay = document.getElementById('bestScoreDisplay');
+        const mobileVersionLinkWrap = document.getElementById('mobileVersionLinkWrap');
+        const mobileVersionLink = document.getElementById('mobileVersionLink');
+        const desktopQrPanel = document.getElementById('desktopQrPanel');
+        const desktopQrCard = document.getElementById('desktopQrCard');
+        const desktopQrImage = document.getElementById('desktopQrImage');
         const trailContainer = document.getElementById('trailContainer');
         const particleContainer = document.getElementById('particleContainer');
         const ballCallout = document.getElementById('ballCallout');
@@ -995,6 +1102,8 @@
         let activeBallCallout = null;
         let dominoCalloutCount = 0;
         let lastDominoCalloutAt = -Infinity;
+        let desktopQrVisible = false;
+
         function createTrailNodes() {
             for (let i = 0; i < trailLength; i++) {
                 const node = document.createElement('div');
@@ -1042,6 +1151,8 @@
                     : (viewportHeight <= 500 ? 0.35 : 0.39)
             ));
             const restartBaseTop = safeInsets.top + (viewportHeight * 0.65);
+            const linkBaseTop = safeInsets.top + (viewportHeight * (viewportHeight <= 680 ? 0.72 : 0.74));
+            const qrBaseTop = safeInsets.top + (viewportHeight * (viewportHeight <= 680 ? 0.46 : 0.50));
 
             introText.style.left = `${centerX}px`;
             introText.style.top = `${centerY + ((introBaseTop - centerY) * overlayScale)}px`;
@@ -1057,6 +1168,14 @@
             restartText.style.left = `${centerX}px`;
             restartText.style.top = `${centerY + ((restartBaseTop - centerY) * overlayScale)}px`;
             restartText.style.setProperty('--overlay-text-scale', overlayScale.toFixed(3));
+
+            mobileVersionLinkWrap.style.left = `${centerX}px`;
+            mobileVersionLinkWrap.style.top = `${centerY + ((linkBaseTop - centerY) * overlayScale)}px`;
+            mobileVersionLinkWrap.style.setProperty('--overlay-text-scale', overlayScale.toFixed(3));
+
+            desktopQrPanel.style.left = `${centerX}px`;
+            desktopQrPanel.style.top = `${centerY + ((qrBaseTop - centerY) * overlayScale)}px`;
+            desktopQrPanel.style.setProperty('--overlay-text-scale', overlayScale.toFixed(3));
 
             levelIndicator.style.setProperty('--level-indicator-scale', overlayScale.toFixed(3));
         }
@@ -1355,6 +1474,29 @@
             applyMuteState();
         }
 
+        function ensureDesktopQrCode() {
+            if (desktopQrImage.dataset.loaded === '1') return;
+            desktopQrCard.href = MOBILE_VERSION_URL;
+            desktopQrImage.src = `https://api.qrserver.com/v1/create-qr-code/?size=240x240&margin=0&data=${encodeURIComponent(MOBILE_VERSION_URL)}`;
+            desktopQrImage.dataset.loaded = '1';
+        }
+
+        function setDesktopQrVisible(visible) {
+            const canShowDesktopStartUi = shouldUseKeyboardPrompt() && !isPlaying && !isFalling && !isShowingGameOver;
+            desktopQrVisible = canShowDesktopStartUi && Boolean(visible);
+            desktopQrPanel.style.display = desktopQrVisible ? 'block' : 'none';
+            desktopQrPanel.setAttribute('aria-hidden', String(!desktopQrVisible));
+            if (desktopQrVisible) {
+                ensureDesktopQrCode();
+            }
+        }
+
+        function syncDesktopStartUiVisibility() {
+            const canShowDesktopStartUi = shouldUseKeyboardPrompt() && !isPlaying && !isFalling && !isShowingGameOver;
+            mobileVersionLinkWrap.style.display = canShowDesktopStartUi ? 'block' : 'none';
+            setDesktopQrVisible(canShowDesktopStartUi && desktopQrVisible);
+        }
+
         function updateViewportBounds() {
             const probeStyles = getComputedStyle(safeAreaProbe);
             safeInsets = {
@@ -1377,6 +1519,7 @@
 
             introText.innerHTML = getIntroCopy();
             updatePlayfieldFrame();
+            syncDesktopStartUiVisibility();
 
             if (!isPlaying && !isFalling && !isShowingGameOver) {
                 positionBallAtCenter();
@@ -1441,7 +1584,6 @@
             const cornerY = py < innerTop ? innerTop : innerBottom;
             return Math.hypot(px - cornerX, py - cornerY) <= cornerRadius;
         }
-
 
         function applyPlayfieldBorderThreatOpacity(now = performance.now()) {
             const bounds = getPlayfieldBounds(now);
@@ -2447,7 +2589,6 @@
             return { bounds, danger };
         }
 
-
         function applyEdgeThreatOpacity() {
             edgeThreatTop.style.opacity = Math.pow(clamp01(currentBorderDangerFade.top || 0), 0.8).toFixed(3);
             edgeThreatRight.style.opacity = Math.pow(clamp01(currentBorderDangerFade.right || 0), 0.8).toFixed(3);
@@ -2965,6 +3106,7 @@
             clearPendingLevelAdvance();
             clearStartInputTimeout();
             setShrinkWarningTone(false);
+            setDesktopQrVisible(false);
             if (levelGrowAnimation?.source === 'wall_knock') {
                 const stabilizedScale = Math.min(1, getPlayfieldScale(finishNow));
                 if (playfieldScale > 0 && Math.abs(stabilizedScale - playfieldScale) > 0.000001) {
@@ -3003,6 +3145,7 @@
             restartText.innerHTML = getRestartCopy(false);
             restartText.style.display = 'block';
             updateLevelIndicatorState();
+            syncDesktopStartUiVisibility();
             armStartInput(250);
         }
 
@@ -3219,6 +3362,7 @@
             wasAutoPausedOnBlur = false;
             isLevelingUp = false;
             isShowingGameOver = false;
+            setDesktopQrVisible(false);
             const runStartAt = performance.now();
             resetIdleShrinkState(runStartAt);
             armLevelStartShrinkDelay(level, runStartAt);
@@ -3228,6 +3372,7 @@
 
             introText.style.display = 'none';
             restartText.style.display = 'none';
+            syncDesktopStartUiVisibility();
             updateLevelIndicatorState();
 
             update();
@@ -3256,6 +3401,7 @@
         updateLevelIndicatorState();
         applyPauseState();
         applyMuteState();
+        syncDesktopStartUiVisibility();
         armStartInput();
 
         gameArea.addEventListener('pointerdown', handlePointerControlStart);
@@ -3271,6 +3417,15 @@
             event.stopPropagation();
             toggleMute();
         });
+        mobileVersionLink.addEventListener('pointerdown', event => event.stopPropagation());
+        mobileVersionLink.addEventListener('touchend', event => event.stopPropagation());
+        mobileVersionLink.addEventListener('click', event => {
+            event.stopPropagation();
+            setDesktopQrVisible(!desktopQrVisible);
+        });
+        desktopQrCard.addEventListener('pointerdown', event => event.stopPropagation());
+        desktopQrCard.addEventListener('touchend', event => event.stopPropagation());
+        desktopQrCard.addEventListener('click', event => event.stopPropagation());
         document.addEventListener('click', handleStartInput);
         document.addEventListener('touchend', handleStartInput);
 
