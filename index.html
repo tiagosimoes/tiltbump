@@ -535,7 +535,7 @@
             text-align: center;
             font-size: 20px;
             color: var(--hud-color);
-            line-height: 1.35;
+            line-height: 1.25;
             font-weight: inherit;
             pointer-events: none;
             z-index: 1000;
@@ -543,7 +543,11 @@
         }
 
         #achievementSummary .achievement-line {
-            margin-top: 4px;
+            margin-top: 2px;
+        }
+
+        #achievementSummary .achievement-line:first-child {
+            margin-top: 0;
         }
 
         #achievementSummary .achievement-line.record {
@@ -1103,7 +1107,8 @@
             wallKnocks: false,
             doubleHits: false,
             dominos: false,
-            doubleDominos: false
+            doubleDominos: false,
+            combos: false
         };
         let isMuted = readMutePreference();
         let bestScoreBeforeRun = bestScore;
@@ -1224,7 +1229,7 @@
             restartText.style.setProperty('--overlay-text-scale', overlayScale.toFixed(3));
             if (isShowingGameOver && achievementSummary.style.display !== 'none') {
                 const achievementRect = achievementSummary.getBoundingClientRect();
-                const restartTop = achievementRect.bottom + (viewportHeight <= 500 ? 10 : 14);
+                const restartTop = achievementRect.bottom + 2;
                 restartText.style.top = `${restartTop}px`;
             } else {
                 restartText.style.top = `${centerY + ((restartBaseTop - centerY) * overlayScale)}px`;
@@ -1483,11 +1488,18 @@
             doubleHitCalloutTotal = 0;
             dominoCalloutTotal = 0;
             doubleDominoCalloutTotal = 0;
+            comboCalloutTotal = 0;
+            lastComboAt = -Infinity;
+            lastComboSourceAt = {
+                domino: -Infinity,
+                wall: -Infinity
+            };
             achievementRecordHighlights = {
                 wallKnocks: false,
                 doubleHits: false,
                 dominos: false,
-                doubleDominos: false
+                doubleDominos: false,
+                combos: false
             };
         }
 
@@ -1516,6 +1528,11 @@
                     key: 'doubleDominos',
                     count: doubleDominoCalloutTotal,
                     label: `${doubleDominoCalloutTotal}x ${pluralizeAchievementLabel(doubleDominoCalloutTotal, 'double domino', 'double dominos')}!`
+                },
+                {
+                    key: 'combos',
+                    count: comboCalloutTotal,
+                    label: `${comboCalloutTotal}x ${pluralizeAchievementLabel(comboCalloutTotal, 'combo', 'combos')}!`
                 }
             ].filter(line => line.count > 0);
         }
@@ -1525,7 +1542,8 @@
                 wallKnocks: wallKnockCalloutTotal > (achievementBestRecords.wallKnocks || 0),
                 doubleHits: doubleHitCalloutTotal > (achievementBestRecords.doubleHits || 0),
                 dominos: dominoCalloutTotal > (achievementBestRecords.dominos || 0),
-                doubleDominos: doubleDominoCalloutTotal > (achievementBestRecords.doubleDominos || 0)
+                doubleDominos: doubleDominoCalloutTotal > (achievementBestRecords.doubleDominos || 0),
+                combos: comboCalloutTotal > (achievementBestRecords.combos || 0)
             };
         }
 
@@ -2670,15 +2688,16 @@
 
         function registerWallKnock(domino, hitRect, wallAxis, now) {
             if (!domino || !hitRect) return;
-            if ((domino.lastWallCalloutAt ?? -Infinity) + wallCalloutCooldownMs > now) return;
+            if ((domino.lastWallCalloutAt ?? -Infinity) + 220 > now) return;
 
             const strength = getWallKnockStrength(domino, hitRect, wallAxis);
-            if (strength < 0.04) return;
+            if (strength < 0.015) return;
 
             domino.lastWallCalloutAt = now;
             shrinkPausedUntil = Math.max(shrinkPausedUntil, now + blockKnockShrinkPauseMs);
             wallKnockCalloutTotal++;
             showBallCallout('Wall knock!', now, 760);
+            maybeRegisterCombo('wall', now);
             expandPlayfieldOnWallKnock(now, strength);
         }
 
