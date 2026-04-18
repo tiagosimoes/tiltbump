@@ -2184,7 +2184,7 @@
         }
 
         function shouldHighlightCurrentLevel() {
-            return !currentRunIsPreview && bestScoreBeforeRun > 0 && level > bestScoreBeforeRun;
+            return !currentRunIsPreview && level > bestScoreBeforeRun && level > 1;
         }
 
         function updateBestScoreDisplayState() {
