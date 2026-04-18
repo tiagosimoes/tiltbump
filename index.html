@@ -1152,7 +1152,7 @@
         let dominoCalloutTotal = 0;
         let doubleDominoCalloutTotal = 0;
         let comboCalloutTotal = 0;
-        let queuedBallCallout = null;
+        let queuedBallCallouts = [];
         let lastComboAt = -Infinity;
         let lastComboSourceAt = {
             domino: -Infinity,
@@ -2571,21 +2571,40 @@
             }
         }
 
-        function clearBallCallout() {
+        function clearBallCallout(clearQueued = false) {
             activeBallCallout = null;
             ballCallout.style.opacity = '0';
             ballCallout.style.transform = 'translate(-9999px, -9999px)';
+            if (clearQueued) {
+                queuedBallCallouts.length = 0;
+            }
         }
 
         function queueBallCallout(text, now, durationMs = ballCalloutDurationMs, gapMs = 70) {
-            const startAt = activeBallCallout
-                ? Math.max(now, activeBallCallout.startedAt + activeBallCallout.durationMs + gapMs)
+            const lastQueuedCallout = queuedBallCallouts.length
+                ? queuedBallCallouts[queuedBallCallouts.length - 1]
+                : null;
+            const activeEndsAt = activeBallCallout
+                ? activeBallCallout.startedAt + activeBallCallout.durationMs
                 : now;
-            queuedBallCallout = {
+            const queuedEndsAt = lastQueuedCallout
+                ? lastQueuedCallout.startAt + lastQueuedCallout.durationMs
+                : now;
+            const startAt = Math.max(now, activeEndsAt, queuedEndsAt) + (activeBallCallout || lastQueuedCallout ? gapMs : 0);
+            queuedBallCallouts.push({
                 text,
                 startAt,
                 durationMs
-            };
+            });
+        }
+
+        function startNextQueuedBallCallout(now = performance.now()) {
+            if (!queuedBallCallouts.length) return false;
+            const nextCallout = queuedBallCallouts[0];
+            if (now < nextCallout.startAt) return false;
+            queuedBallCallouts.shift();
+            showBallCallout(nextCallout.text, now, nextCallout.durationMs);
+            return true;
         }
 
         function maybeRegisterCombo(source, now) {
@@ -2630,22 +2649,14 @@
 
         function updateBallCallout(now = performance.now()) {
             if (!activeBallCallout) {
-                if (queuedBallCallout && now >= queuedBallCallout.startAt) {
-                    const nextCallout = queuedBallCallout;
-                    queuedBallCallout = null;
-                    showBallCallout(nextCallout.text, now, nextCallout.durationMs);
-                }
+                startNextQueuedBallCallout(now);
                 return;
             }
 
             const elapsed = now - activeBallCallout.startedAt;
             if (elapsed >= activeBallCallout.durationMs) {
                 clearBallCallout();
-                if (queuedBallCallout && now >= queuedBallCallout.startAt) {
-                    const nextCallout = queuedBallCallout;
-                    queuedBallCallout = null;
-                    showBallCallout(nextCallout.text, now, nextCallout.durationMs);
-                }
+                startNextQueuedBallCallout(now);
                 return;
             }
 
@@ -3187,7 +3198,7 @@
             dominoes = [];
             dominoCalloutCount = 0;
             lastDominoCalloutAt = -Infinity;
-            clearBallCallout();
+            clearBallCallout(true);
             const size = getBlockSize();
             const count = getBlockCountForLevel(targetLevel);
             const bounds = getPlayfieldBounds();
@@ -3356,7 +3367,7 @@
             isLevelingUp = false;
             hideMouseOriginCrosshair();
             clearPendingLevelAdvance();
-            clearBallCallout();
+            clearBallCallout(true);
             setShrinkWarningTone(false);
             applyPauseState();
         }
@@ -3412,7 +3423,7 @@
             ball.style.display = 'none';
             resetTrail();
             clearParticles();
-            clearBallCallout();
+            clearBallCallout(true);
             clearEdgeGlow(true);
             startLevelGrowAnimation(finishNow);
             applyPauseState();
@@ -3549,7 +3560,7 @@
                     if (unclearedCount === 0 && !isLevelingUp) {
                         isLevelingUp = true;
                         clearPendingLevelAdvance();
-                        clearBallCallout();
+                        clearBallCallout(true);
                         triggerTransitionFlash(isMilestoneLevel(level + 1) ? 0.42 : 0.26);
                         levelAdvanceTimeoutId = setTimeout(() => {
                             levelAdvanceTimeoutId = null;
@@ -3631,9 +3642,7 @@
             ball.style.display = 'block';
             resetTrail();
             clearParticles();
-            clearBallCallout();
-            resetRunAchievementTotals();
-            updateAchievementSummaryState();
+            clearBallCallout(true);
             setShrinkWarningTone(false);
             transitionFlashOpacity = 0;
             transitionFlash.style.opacity = '0';
