@@ -816,7 +816,7 @@
         <div id="transitionFlash" aria-hidden="true"></div>
     </div>
 
-    <div id="introText">lightly tilt phone to bump all blocks<br>but don't fall off the board</div>
+    <div id="introText">lightly tilt phone to bump blocks<br>but don't fall off the board</div>
     <div id="bestScoreDisplay">Best: 0</div>
     <div id="restartText">tap anywhere to start</div>
     <div id="desktopQrPanel" aria-hidden="true">
@@ -3135,7 +3135,7 @@
 
             const shouldShowHoldStill = isFirstLaunch || (isShowingGameOver && level < 3);
             let text = shouldShowHoldStill
-                ? `hold phone still and<br>tap anywhere to ${isFirstLaunch ? 'start' : 'restart'}`
+                ? `hold phone very still and<br>tap anywhere to ${isFirstLaunch ? 'start' : 'restart'}`
                 : `tap anywhere to ${isFirstLaunch ? 'start' : 'restart'}`;
 
             if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function' && !motionPermissionGranted) {
@@ -3148,8 +3148,8 @@
 
 function getIntroCopy() {
             return shouldUseKeyboardPrompt()
-                ? "slowly move mouse to bump all blocks<br>but don't fall off the board"
-                : "lightly tilt phone to bump all blocks<br>but don't fall off the board";
+                ? "slowly move mouse to bump blocks<br>but don't fall off the board"
+                : "lightly tilt phone to bump blocks<br>but don't fall off the board";
         }
 
         function isStandaloneDisplayMode() {
