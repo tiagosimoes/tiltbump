@@ -1214,6 +1214,12 @@
         let motionPermissionGranted = false;
         let latestTitleLogoTiltX = 0;
         let latestTitleLogoTiltY = 0;
+        let latestRawTitleLogoTiltX = 0;
+        let latestRawTitleLogoTiltY = 0;
+        let titleLogoTiltOriginX = 0;
+        let titleLogoTiltOriginY = 0;
+        let titleLogoMotionOriginInitialized = false;
+        let titleLogoWasVisible = false;
         let wasAutoPausedOnBlur = false;
         let pauseStartedAt = null;
         let lastPlayfieldPauseTouchAt = -Infinity;
@@ -1279,9 +1285,10 @@
 
         function updateTitleLogoState() {
             const showTitleLogo = shouldShowTitleLogo();
+            titleLogoWasVisible = showTitleLogo;
             titleLogo.style.display = showTitleLogo ? 'block' : 'none';
             titleLogo.setAttribute('aria-hidden', String(!showTitleLogo));
-            applyTitleLogoMotion();
+            resetTitleLogoMotion();
         }
 
         function resetTitleLogoMotion() {
@@ -1293,27 +1300,29 @@
             titleLogo.style.setProperty('--logo-p-y', '0px');
         }
 
-        function applyTitleLogoMotion() {
-            const canAnimate = !shouldUseKeyboardPrompt() && motionPermissionGranted && shouldShowTitleLogo();
-            if (!canAnimate) {
-                resetTitleLogoMotion();
-                return;
-            }
+        function prepareTitleLogoMotionOriginRefresh() {
+            titleLogoMotionOriginInitialized = false;
+            latestTitleLogoTiltX = 0;
+            latestTitleLogoTiltY = 0;
+            applyTitleLogoMotion();
+        }
 
-            const tiltX = clampValue(latestTitleLogoTiltX, 12);
-            const tiltY = clampValue(latestTitleLogoTiltY, 12);
-            titleLogo.style.setProperty('--logo-u-x', `${(tiltX * 0.62).toFixed(2)}px`);
-            titleLogo.style.setProperty('--logo-u-y', `${(tiltY * 0.46).toFixed(2)}px`);
-            titleLogo.style.setProperty('--logo-m-x', `${(tiltX * 0.98).toFixed(2)}px`);
-            titleLogo.style.setProperty('--logo-m-y', `${(tiltY * 0.72).toFixed(2)}px`);
-            titleLogo.style.setProperty('--logo-p-x', `${(tiltX * 1.34).toFixed(2)}px`);
-            titleLogo.style.setProperty('--logo-p-y', `${(tiltY * 0.98).toFixed(2)}px`);
+        function recenterTitleLogoMotionOrigin() {
+            titleLogoTiltOriginX = latestRawTitleLogoTiltX;
+            titleLogoTiltOriginY = latestRawTitleLogoTiltY;
+            titleLogoMotionOriginInitialized = true;
+            latestTitleLogoTiltX = 0;
+            latestTitleLogoTiltY = 0;
+            applyTitleLogoMotion();
+        }
+
+        function applyTitleLogoMotion() {
+            resetTitleLogoMotion();
         }
 
         function updateTitleLogoMotionFromViewportTilt(tiltX, tiltY) {
-            latestTitleLogoTiltX = tiltX;
-            latestTitleLogoTiltY = tiltY;
-            applyTitleLogoMotion();
+            latestRawTitleLogoTiltX = tiltX;
+            latestRawTitleLogoTiltY = tiltY;
         }
 
         function updateOverlayTextLayout(now = performance.now()) {
@@ -1771,6 +1780,8 @@
             const pauseDuration = pauseStartedAt === null ? 0 : Math.max(0, now - pauseStartedAt);
             pauseStartedAt = null;
             lastPlayfieldScaleUpdateAt = now;
+
+            prepareTitleLogoMotionOriginRefresh();
 
             if (pauseDuration <= 0) return;
 
@@ -4063,6 +4074,7 @@ function getIntroCopy() {
             updateViewportBounds();
 
             resetInputState();
+            prepareTitleLogoMotionOriginRefresh();
             resetRunAchievementTotals();
             updateAchievementSummaryState();
             bestScoreBeforeRun = bestScore;
@@ -4132,6 +4144,7 @@ function getIntroCopy() {
         restartText.innerHTML = getRestartCopy(true);
         updateLevelIndicatorState();
         updateAchievementSummaryState();
+        prepareTitleLogoMotionOriginRefresh();
         applyPauseState();
         applyMuteState();
         syncDesktopStartUiVisibility();
