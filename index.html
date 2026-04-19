@@ -891,8 +891,6 @@
         const dampening = 0.6;
         const levelOneBallFriction = 0.985;
         const levelFrictionStep = 0.0015;
-        const levelOneBallFrictionBonus = 0.008;
-        const levelTwoBallFrictionBonus = 0.004;
         const earlyMaxBallFriction = 0.997;
         const lateLevelBallFrictionStep = 0.00012;
         const maxBallFriction = 0.9992;
@@ -2148,12 +2146,6 @@
                 friction = Math.min(earlyMaxBallFriction + (level - 9) * lateLevelBallFrictionStep, maxBallFriction);
             }
 
-            if (level === 1) {
-                friction = Math.min(friction + levelOneBallFrictionBonus, maxBallFriction);
-            } else if (level === 2) {
-                friction = Math.min(friction + levelTwoBallFrictionBonus, maxBallFriction);
-            }
-
             if (shouldUseKeyboardPrompt()) {
                 friction = Math.min(friction + desktopBallFrictionBonus, maxBallFriction);
             }
@@ -3214,26 +3206,75 @@ function getIntroCopy() {
             const bounds = getPlayfieldBounds();
             const spawnWidth = bounds.right - bounds.left;
             const spawnHeight = bounds.bottom - bounds.top;
+            const maxPlacementAttempts = 400;
+            const shrinkRatio = Math.max(0.18, getPlayfieldScale());
 
-            for (let i = 0; i < count; i++) {
-                let rx;
-                let ry;
-                let overlap = true;
+            function overlapsExistingDominoes(testX, testY) {
+                for (const domino of dominoes) {
+                    if (testX < domino.x + size && testX + size > domino.x && testY < domino.y + size && testY + size > domino.y) {
+                        return true;
+                    }
+                }
+                return false;
+            }
 
-                while (overlap) {
-                    rx = bounds.left + Math.random() * Math.max(spawnWidth - size, 1);
-                    ry = bounds.top + Math.random() * Math.max(spawnHeight - size, 1);
-                    overlap = Math.hypot(rx - x, ry - y) <= 120;
+            function tryFindSpawnPosition(minDistanceFromBall) {
+                for (let attempt = 0; attempt < maxPlacementAttempts; attempt++) {
+                    const testX = bounds.left + Math.random() * Math.max(spawnWidth - size, 1);
+                    const testY = bounds.top + Math.random() * Math.max(spawnHeight - size, 1);
+                    if (Math.hypot(testX - x, testY - y) <= minDistanceFromBall) {
+                        continue;
+                    }
+                    if (overlapsExistingDominoes(testX, testY)) {
+                        continue;
+                    }
+                    return { x: testX, y: testY };
+                }
+                return null;
+            }
 
-                    if (!overlap) {
-                        for (const domino of dominoes) {
-                            if (rx < domino.x + size && rx + size > domino.x && ry < domino.y + size && ry + size > domino.y) {
-                                overlap = true;
-                                break;
-                            }
+            function findFallbackSpawnPosition() {
+                const step = Math.max(12, Math.floor(size * 0.35));
+                let bestPosition = null;
+                let bestScore = -Infinity;
+
+                for (let testY = bounds.top; testY <= bounds.bottom - size; testY += step) {
+                    for (let testX = bounds.left; testX <= bounds.right - size; testX += step) {
+                        if (overlapsExistingDominoes(testX, testY)) {
+                            continue;
+                        }
+                        const distanceFromBall = Math.hypot(testX - x, testY - y);
+                        if (distanceFromBall > bestScore) {
+                            bestScore = distanceFromBall;
+                            bestPosition = { x: testX, y: testY };
                         }
                     }
                 }
+
+                if (bestPosition) {
+                    return bestPosition;
+                }
+
+                return {
+                    x: bounds.left + Math.max(0, (spawnWidth - size) / 2),
+                    y: bounds.top + Math.max(0, (spawnHeight - size) / 2)
+                };
+            }
+
+            for (let i = 0; i < count; i++) {
+                let spawnPosition = tryFindSpawnPosition(120 * shrinkRatio);
+                if (!spawnPosition) {
+                    spawnPosition = tryFindSpawnPosition(72 * shrinkRatio);
+                }
+                if (!spawnPosition) {
+                    spawnPosition = tryFindSpawnPosition(36 * shrinkRatio);
+                }
+                if (!spawnPosition) {
+                    spawnPosition = findFallbackSpawnPosition();
+                }
+
+                const rx = spawnPosition.x;
+                const ry = spawnPosition.y;
 
                 const element = document.createElement('div');
                 element.className = 'domino';
