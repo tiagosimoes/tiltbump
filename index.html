@@ -597,6 +597,20 @@
 
         #titleLogo .bump span {
             display: inline-block;
+            transition: transform 90ms linear;
+            will-change: transform;
+        }
+
+        #titleLogo .bump .letter-u {
+            transform: translate3d(var(--logo-u-x, 0px), var(--logo-u-y, 0px), 0);
+        }
+
+        #titleLogo .bump .letter-m {
+            transform: translate3d(var(--logo-m-x, 0px), var(--logo-m-y, 0px), 0);
+        }
+
+        #titleLogo .bump .letter-p {
+            transform: translate3d(var(--logo-p-x, 0px), var(--logo-p-y, 0px), 0);
         }
 
         #titleLogo .bump span:nth-child(1) { margin-right: 0.04em; }
@@ -864,7 +878,7 @@
 
     <div id="titleLogo" aria-hidden="true">
         <div class="logo" aria-label="tiltbump">
-            <span class="tilt">tilt</span><span class="bump"><span>b</span><span>u</span><span>m</span><span>p</span></span>
+            <span class="tilt">tilt</span><span class="bump"><span>b</span><span class="letter-u">u</span><span class="letter-m">m</span><span class="letter-p">p</span></span>
         </div>
     </div>
 
@@ -1198,6 +1212,8 @@
         let awaitingStartInput = false;
         let startInputTimeoutId = null;
         let motionPermissionGranted = false;
+        let latestTitleLogoTiltX = 0;
+        let latestTitleLogoTiltY = 0;
         let wasAutoPausedOnBlur = false;
         let pauseStartedAt = null;
         let lastPlayfieldPauseTouchAt = -Infinity;
@@ -1265,6 +1281,39 @@
             const showTitleLogo = shouldShowTitleLogo();
             titleLogo.style.display = showTitleLogo ? 'block' : 'none';
             titleLogo.setAttribute('aria-hidden', String(!showTitleLogo));
+            applyTitleLogoMotion();
+        }
+
+        function resetTitleLogoMotion() {
+            titleLogo.style.setProperty('--logo-u-x', '0px');
+            titleLogo.style.setProperty('--logo-u-y', '0px');
+            titleLogo.style.setProperty('--logo-m-x', '0px');
+            titleLogo.style.setProperty('--logo-m-y', '0px');
+            titleLogo.style.setProperty('--logo-p-x', '0px');
+            titleLogo.style.setProperty('--logo-p-y', '0px');
+        }
+
+        function applyTitleLogoMotion() {
+            const canAnimate = !shouldUseKeyboardPrompt() && motionPermissionGranted && shouldShowTitleLogo();
+            if (!canAnimate) {
+                resetTitleLogoMotion();
+                return;
+            }
+
+            const tiltX = clampValue(latestTitleLogoTiltX, 10);
+            const tiltY = clampValue(latestTitleLogoTiltY, 10);
+            titleLogo.style.setProperty('--logo-u-x', `${(tiltX * 0.45).toFixed(2)}px`);
+            titleLogo.style.setProperty('--logo-u-y', `${(tiltY * 0.34).toFixed(2)}px`);
+            titleLogo.style.setProperty('--logo-m-x', `${(tiltX * 0.75).toFixed(2)}px`);
+            titleLogo.style.setProperty('--logo-m-y', `${(tiltY * 0.56).toFixed(2)}px`);
+            titleLogo.style.setProperty('--logo-p-x', `${(tiltX * 1.05).toFixed(2)}px`);
+            titleLogo.style.setProperty('--logo-p-y', `${(tiltY * 0.78).toFixed(2)}px`);
+        }
+
+        function updateTitleLogoMotionFromViewportTilt(tiltX, tiltY) {
+            latestTitleLogoTiltX = tiltX;
+            latestTitleLogoTiltY = tiltY;
+            applyTitleLogoMotion();
         }
 
         function updateOverlayTextLayout(now = performance.now()) {
@@ -3331,7 +3380,6 @@ function getIntroCopy() {
         }
 
         function handleDeviceMotion(event) {
-            if (!isPlaying || isPaused) return;
             const acceleration = event.accelerationIncludingGravity;
             const hasSample = acceleration && [acceleration.x, acceleration.y, acceleration.z].some(value => Number.isFinite(value));
             if (!hasSample) return;
@@ -3342,13 +3390,17 @@ function getIntroCopy() {
                 baselineX = rx;
                 baselineY = ry;
             }
-            motionSampleCount++;
-            activeInputMode = 'motion';
             const facingMultiplier = getMotionFacingMultiplier(acceleration.z);
             const viewportTilt = rotatePortraitTiltToViewport(
                 (rx - baselineX) * facingMultiplier,
                 -(ry - baselineY) * facingMultiplier
             );
+            updateTitleLogoMotionFromViewportTilt(viewportTilt.x, viewportTilt.y);
+
+            if (!isPlaying || isPaused) return;
+
+            motionSampleCount++;
+            activeInputMode = 'motion';
             ax = viewportTilt.x * 0.4;
             ay = viewportTilt.y * 0.4;
         }
@@ -3357,20 +3409,23 @@ function getIntroCopy() {
             if (!Number.isFinite(event.beta) || !Number.isFinite(event.gamma)) return;
             latestOrientationBeta = event.beta;
             latestOrientationGamma = event.gamma;
-            if (!isPlaying || isPaused || activeInputMode === 'motion') return;
 
             if (baselineBeta === null) {
                 baselineBeta = event.beta;
                 baselineGamma = event.gamma;
             }
 
-            orientationSampleCount++;
-            activeInputMode = 'orientation';
             const facingMultiplier = getOrientationFacingMultiplier(event.beta, event.gamma) ?? 1;
             const viewportTilt = rotatePortraitTiltToViewport(
                 (event.gamma - baselineGamma) * facingMultiplier,
                 (event.beta - baselineBeta) * facingMultiplier
             );
+            updateTitleLogoMotionFromViewportTilt(viewportTilt.x * 0.25, viewportTilt.y * 0.25);
+
+            if (!isPlaying || isPaused || activeInputMode === 'motion') return;
+
+            orientationSampleCount++;
+            activeInputMode = 'orientation';
             ax = viewportTilt.x * 0.06;
             ay = viewportTilt.y * 0.06;
         }
@@ -4056,11 +4111,14 @@ function getIntroCopy() {
                 if (restartText && restartText.style.display !== 'none') {
                     restartText.innerHTML = getRestartCopy(!isShowingGameOver);
                 }
+                applyTitleLogoMotion();
             }
         }
         window.addEventListener('devicemotion', handleEarlyDeviceMotion);
 
         createTrailNodes();
+        ensureMotionListener();
+        ensureOrientationListener();
         updateViewportBounds();
 
         ball.style.display = 'block';
