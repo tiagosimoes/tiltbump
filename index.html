@@ -3395,7 +3395,9 @@ function getIntroCopy() {
                 (rx - baselineX) * facingMultiplier,
                 -(ry - baselineY) * facingMultiplier
             );
-            updateTitleLogoMotionFromViewportTilt(viewportTilt.x, viewportTilt.y);
+            if (shouldShowTitleLogo()) {
+                updateTitleLogoMotionFromViewportTilt(viewportTilt.x, viewportTilt.y);
+            }
 
             if (!isPlaying || isPaused) return;
 
@@ -3420,7 +3422,9 @@ function getIntroCopy() {
                 (event.gamma - baselineGamma) * facingMultiplier,
                 (event.beta - baselineBeta) * facingMultiplier
             );
-            updateTitleLogoMotionFromViewportTilt(viewportTilt.x * 0.25, viewportTilt.y * 0.25);
+            if (shouldShowTitleLogo()) {
+                updateTitleLogoMotionFromViewportTilt(viewportTilt.x * 0.25, viewportTilt.y * 0.25);
+            }
 
             if (!isPlaying || isPaused || activeInputMode === 'motion') return;
 
