@@ -557,6 +557,52 @@
             color: var(--record-color-solid);
         }
 
+        #titleLogo {
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%) scale(var(--overlay-text-scale, 1));
+            transform-origin: center top;
+            width: calc(100vw - 32px);
+            max-width: 560px;
+            padding: 0 calc(16px + var(--safe-right)) 0 calc(16px + var(--safe-left));
+            box-sizing: border-box;
+            text-align: center;
+            pointer-events: none;
+            z-index: 1002;
+            display: none;
+            color: rgba(255, 255, 255, 0.96);
+            text-shadow: 0 2px 14px rgba(0, 0, 0, 0.28);
+        }
+
+        #titleLogo .logo {
+            line-height: 1;
+            white-space: nowrap;
+            user-select: none;
+            letter-spacing: -0.04em;
+            font-size: clamp(42px, 11vw, 88px);
+        }
+
+        #titleLogo .tilt {
+            display: inline-block;
+            font-style: italic;
+            font-weight: 300;
+            transform: skewX(-7deg);
+            margin-right: 0.05em;
+        }
+
+        #titleLogo .bump {
+            display: inline-block;
+            font-weight: 700;
+        }
+
+        #titleLogo .bump span {
+            display: inline-block;
+        }
+
+        #titleLogo .bump span:nth-child(1) { margin-right: 0.04em; }
+        #titleLogo .bump span:nth-child(2) { margin-right: 0.08em; }
+        #titleLogo .bump span:nth-child(3) { margin-right: 0.13em; }
+
         #introText {
             top: calc(30% + var(--safe-top));
             z-index: 1000;
@@ -816,6 +862,12 @@
         <div id="transitionFlash" aria-hidden="true"></div>
     </div>
 
+    <div id="titleLogo" aria-hidden="true">
+        <div class="logo" aria-label="tiltbump">
+            <span class="tilt">tilt</span><span class="bump"><span>b</span><span>u</span><span>m</span><span>p</span></span>
+        </div>
+    </div>
+
     <div id="introText">lightly tilt phone to bump blocks<br>but don't fall off the board</div>
     <div id="bestScoreDisplay">Best: 0</div>
     <div id="restartText">tap anywhere to start</div>
@@ -852,6 +904,7 @@
         const achievementSummary = document.getElementById('achievementSummary');
         const restartText = document.getElementById('restartText');
         const introText = document.getElementById('introText');
+        const titleLogo = document.getElementById('titleLogo');
         const bestScoreDisplay = document.getElementById('bestScoreDisplay');
         const mobileVersionLinkWrap = document.getElementById('mobileVersionLinkWrap');
         const mobileVersionLink = document.getElementById('mobileVersionLink');
@@ -1204,6 +1257,16 @@
             ball.style.transform = `translate(${x - radius}px, ${y - radius}px) scale(${getBallVisualScale().toFixed(3)})`;
         }
 
+        function shouldShowTitleLogo() {
+            return isShowingGameOver || (!isPlaying && !isFalling);
+        }
+
+        function updateTitleLogoState() {
+            const showTitleLogo = shouldShowTitleLogo();
+            titleLogo.style.display = showTitleLogo ? 'block' : 'none';
+            titleLogo.setAttribute('aria-hidden', String(!showTitleLogo));
+        }
+
         function updateOverlayTextLayout(now = performance.now()) {
             introText.classList.toggle('game-over', isShowingGameOver);
             const overlayScale = getPlayfieldScale(now);
@@ -1221,6 +1284,11 @@
             const restartBaseTop = safeInsets.top + (viewportHeight * 0.65);
             const linkBaseTop = safeInsets.top + (viewportHeight * (viewportHeight <= 680 ? 0.72 : 0.74));
             const qrBaseTop = safeInsets.top + (viewportHeight * (viewportHeight <= 680 ? 0.46 : 0.50));
+            const logoBaseTop = safeInsets.top + (viewportHeight * (viewportHeight <= 500 ? 0.11 : 0.13));
+
+            titleLogo.style.left = `${centerX}px`;
+            titleLogo.style.top = `${centerY + ((logoBaseTop - centerY) * overlayScale)}px`;
+            titleLogo.style.setProperty('--overlay-text-scale', overlayScale.toFixed(3));
 
             introText.style.left = `${centerX}px`;
             introText.style.top = `${centerY + ((introBaseTop - centerY) * overlayScale)}px`;
@@ -2383,6 +2451,7 @@
             applyThemeForLevel(displayLevel);
             updateBestScoreDisplayState();
             updateAchievementSummaryState();
+            updateTitleLogoState();
             updateOverlayTextLayout();
         }
 
