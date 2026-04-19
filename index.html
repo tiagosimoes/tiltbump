@@ -1167,6 +1167,10 @@
             wall: -Infinity
         };
         let nextAutonomousBlockPlanAt = -Infinity;
+        let levelTargetKnockCount = 1;
+        let levelKnockedCount = 0;
+        let levelBlocksSpawnedCount = 0;
+        let pendingLevelRespawnCount = 0;
 
         function createTrailNodes() {
             for (let i = 0; i < trailLength; i++) {
@@ -2408,6 +2412,10 @@
             domino.removeAt = now + knockedBlockLifetimeMs;
             domino.element.classList.add('knocked');
             domino.element.style.opacity = '1';
+
+            if (isPlaying && !isShowingGameOver) {
+                levelKnockedCount = Math.min(levelTargetKnockCount, levelKnockedCount + 1);
+            }
         }
 
         function isDominoSolid(domino, now) {
@@ -3363,15 +3371,64 @@ function getIntroCopy() {
             }
         }
 
-        function spawnBlocks(targetLevel) {
-            dominoContainer.innerHTML = '';
-            dominoes = [];
-            nextAutonomousBlockPlanAt = -Infinity;
-            dominoCalloutCount = 0;
-            lastDominoCalloutAt = -Infinity;
-            clearBallCallout(true);
-            const size = getBlockSize();
-            const count = getBlockCountForLevel(targetLevel);
+        function countActiveTargetDominoes() {
+            let count = 0;
+            for (const domino of dominoes) {
+                if (!domino.knocked) {
+                    count++;
+                }
+            }
+            return count;
+        }
+
+        function countOccupiedDominoSlots() {
+            return dominoes.length;
+        }
+
+        function resetLevelTargetProgress(targetLevel) {
+            levelTargetKnockCount = Math.max(1, Math.round(targetLevel));
+            levelKnockedCount = 0;
+            levelBlocksSpawnedCount = 0;
+            pendingLevelRespawnCount = 0;
+        }
+
+        function createDominoAt(spawnX, spawnY, size) {
+            const element = document.createElement('div');
+            element.className = 'domino';
+            element.style.width = size + 'px';
+            element.style.height = size + 'px';
+            element.style.left = spawnX + 'px';
+            element.style.top = spawnY + 'px';
+            element.style.transform = 'rotate(0deg) scale(1)';
+            dominoContainer.appendChild(element);
+            dominoes.push({
+                x: spawnX,
+                y: spawnY,
+                width: size,
+                height: size,
+                vx: 0,
+                vy: 0,
+                previousVx: 0,
+                previousVy: 0,
+                recentAcceleration: 0,
+                autoMoveVx: 0,
+                autoMoveVy: 0,
+                angle: 0,
+                angularVelocity: 0,
+                hitCount: 0,
+                lastHitAt: -Infinity,
+                lastWallCalloutAt: -Infinity,
+                knocked: false,
+                knockedAt: null,
+                repositionUntil: null,
+                removeAt: null,
+                element
+            });
+            levelBlocksSpawnedCount++;
+            return dominoes[dominoes.length - 1];
+        }
+
+        function findSpawnPosition(size) {
             const bounds = getPlayfieldBounds();
             const spawnWidth = bounds.right - bounds.left;
             const spawnHeight = bounds.bottom - bounds.top;
@@ -3430,49 +3487,65 @@ function getIntroCopy() {
                 };
             }
 
-            for (let i = 0; i < count; i++) {
-                let spawnPosition = tryFindSpawnPosition(120 * shrinkRatio);
-                if (!spawnPosition) {
-                    spawnPosition = tryFindSpawnPosition(72 * shrinkRatio);
-                }
-                if (!spawnPosition) {
-                    spawnPosition = tryFindSpawnPosition(36 * shrinkRatio);
-                }
-                if (!spawnPosition) {
-                    spawnPosition = findFallbackSpawnPosition();
-                }
+            let spawnPosition = tryFindSpawnPosition(120 * shrinkRatio);
+            if (!spawnPosition) {
+                spawnPosition = tryFindSpawnPosition(72 * shrinkRatio);
+            }
+            if (!spawnPosition) {
+                spawnPosition = tryFindSpawnPosition(36 * shrinkRatio);
+            }
+            if (!spawnPosition) {
+                spawnPosition = findFallbackSpawnPosition();
+            }
 
-                const rx = spawnPosition.x;
-                const ry = spawnPosition.y;
+            return spawnPosition;
+        }
 
-                const element = document.createElement('div');
-                element.className = 'domino';
-                element.style.width = size + 'px';
-                element.style.height = size + 'px';
-                dominoContainer.appendChild(element);
-                dominoes.push({
-                    x: rx,
-                    y: ry,
-                    width: size,
-                    height: size,
-                    vx: 0,
-                    vy: 0,
-                    previousVx: 0,
-                    previousVy: 0,
-                    recentAcceleration: 0,
-                    autoMoveVx: 0,
-                    autoMoveVy: 0,
-                    angle: 0,
-                    angularVelocity: 0,
-                    hitCount: 0,
-                    lastHitAt: -Infinity,
-                    lastWallCalloutAt: -Infinity,
-                    knocked: false,
-                    knockedAt: null,
-                    repositionUntil: null,
-                    removeAt: null,
-                    element
-                });
+        function spawnSingleBlock() {
+            if (levelBlocksSpawnedCount >= levelTargetKnockCount) {
+                return false;
+            }
+
+            const size = getBlockSize();
+            const spawnPosition = findSpawnPosition(size);
+            if (!spawnPosition) {
+                return false;
+            }
+
+            createDominoAt(spawnPosition.x, spawnPosition.y, size);
+            return true;
+        }
+
+        function queueLevelReplacementBlocks() {
+            const desiredActiveCount = Math.min(maxBlockCount, Math.max(0, levelTargetKnockCount - levelKnockedCount));
+            const occupiedCount = countOccupiedDominoSlots();
+            const availableSpawnBudget = Math.max(0, levelTargetKnockCount - levelBlocksSpawnedCount - pendingLevelRespawnCount);
+            const neededBlocks = Math.max(0, desiredActiveCount - (occupiedCount + pendingLevelRespawnCount));
+            pendingLevelRespawnCount += Math.min(neededBlocks, availableSpawnBudget);
+        }
+
+        function flushPendingLevelRespawns() {
+            while (pendingLevelRespawnCount > 0) {
+                if (!spawnSingleBlock()) {
+                    pendingLevelRespawnCount = 0;
+                    break;
+                }
+                pendingLevelRespawnCount--;
+            }
+        }
+
+        function spawnBlocks(targetLevel) {
+            dominoContainer.innerHTML = '';
+            dominoes = [];
+            nextAutonomousBlockPlanAt = -Infinity;
+            dominoCalloutCount = 0;
+            lastDominoCalloutAt = -Infinity;
+            clearBallCallout(true);
+            resetLevelTargetProgress(targetLevel);
+
+            const initialBlockCount = Math.min(getBlockCountForLevel(targetLevel), levelTargetKnockCount);
+            for (let i = 0; i < initialBlockCount; i++) {
+                spawnSingleBlock();
             }
         }
 
@@ -3709,6 +3782,9 @@ function getIntroCopy() {
                             if (now >= domino.removeAt) {
                                 domino.element.remove();
                                 dominoes.splice(i, 1);
+                                if (isPlaying && !isShowingGameOver) {
+                                    queueLevelReplacementBlocks();
+                                }
                                 continue;
                             }
 
@@ -3785,7 +3861,10 @@ function getIntroCopy() {
                         domino.previousVy = domino.vy;
                     }
 
-                    if (unclearedCount === 0 && !isLevelingUp) {
+                    flushPendingLevelRespawns();
+                    const remainingActiveTargets = countActiveTargetDominoes();
+
+                    if (remainingActiveTargets === 0 && levelKnockedCount >= levelTargetKnockCount && !isLevelingUp) {
                         isLevelingUp = true;
                         clearPendingLevelAdvance();
                         clearBallCallout(true);
