@@ -597,7 +597,7 @@
 
         #titleLogo .bump span {
             display: inline-block;
-            transition: transform 90ms linear;
+            transition: transform 160ms cubic-bezier(0.22, 0.78, 0.2, 1);
             will-change: transform;
         }
 
@@ -1300,14 +1300,14 @@
                 return;
             }
 
-            const tiltX = clampValue(latestTitleLogoTiltX, 10);
-            const tiltY = clampValue(latestTitleLogoTiltY, 10);
-            titleLogo.style.setProperty('--logo-u-x', `${(tiltX * 0.45).toFixed(2)}px`);
-            titleLogo.style.setProperty('--logo-u-y', `${(tiltY * 0.34).toFixed(2)}px`);
-            titleLogo.style.setProperty('--logo-m-x', `${(tiltX * 0.75).toFixed(2)}px`);
-            titleLogo.style.setProperty('--logo-m-y', `${(tiltY * 0.56).toFixed(2)}px`);
-            titleLogo.style.setProperty('--logo-p-x', `${(tiltX * 1.05).toFixed(2)}px`);
-            titleLogo.style.setProperty('--logo-p-y', `${(tiltY * 0.78).toFixed(2)}px`);
+            const tiltX = clampValue(latestTitleLogoTiltX, 12);
+            const tiltY = clampValue(latestTitleLogoTiltY, 12);
+            titleLogo.style.setProperty('--logo-u-x', `${(tiltX * 0.62).toFixed(2)}px`);
+            titleLogo.style.setProperty('--logo-u-y', `${(tiltY * 0.46).toFixed(2)}px`);
+            titleLogo.style.setProperty('--logo-m-x', `${(tiltX * 0.98).toFixed(2)}px`);
+            titleLogo.style.setProperty('--logo-m-y', `${(tiltY * 0.72).toFixed(2)}px`);
+            titleLogo.style.setProperty('--logo-p-x', `${(tiltX * 1.34).toFixed(2)}px`);
+            titleLogo.style.setProperty('--logo-p-y', `${(tiltY * 0.98).toFixed(2)}px`);
         }
 
         function updateTitleLogoMotionFromViewportTilt(tiltX, tiltY) {
