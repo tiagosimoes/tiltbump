@@ -1315,7 +1315,7 @@
         }
 
         function updatePlayfieldLighting(now = performance.now()) {
-            playfieldTint.style.background = `linear-gradient(160deg, ${currentTheme.bgTop} 0%, ${currentTheme.bgBottom} 100%)`;
+            playfieldTint.style.background = currentTheme.bgTop;
         }
 
         function applyThemeForLevel(value) {
@@ -1851,7 +1851,7 @@
                 ? 1
                 : shrinkCueState.flashStrength;
             const playfieldTintOpacity = frameWidth > 0 && frameHeight > 0 ? 1 : 0;
-            const outsideGlowOpacity = borderVisible ? 1 : 0;
+            const outsideGlowOpacity = 0;
             const outsideGlowNearBlur = 24 + (shrinkAmount * 4);
             const outsideGlowFarBlur = 64 + (shrinkAmount * 12);
             const outsideGlowNearSpread = 3 + (shrinkAmount * 2);
@@ -1877,7 +1877,7 @@
             outsideGlow.style.height = `${frameHeight}px`;
             outsideGlow.style.opacity = outsideGlowOpacity.toFixed(3);
             outsideGlow.style.borderRadius = `${cornerRadius.toFixed(2)}px`;
-            outsideGlow.style.boxShadow = `0 0 ${outsideGlowNearBlur}px ${outsideGlowNearSpread}px var(--bg-accent), 0 0 ${outsideGlowFarBlur}px ${outsideGlowFarSpread}px var(--bg-accent-soft)`;
+            outsideGlow.style.boxShadow = 'none';
 
             playfieldBorder.style.left = `${bounds.left}px`;
             playfieldBorder.style.top = `${bounds.top}px`;
