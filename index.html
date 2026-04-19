@@ -942,6 +942,13 @@
         const minimumPlayfieldInsetPx = 10;
         const previewMinLevel = 1;
         const previewMaxLevel = 30;
+        const autonomousBlockMoveStartLevel = 10;
+        const autonomousBlockMoveIntervalMs = 2000;
+        const autonomousBlockMoveFramesEstimate = Math.max(30, Math.round(autonomousBlockMoveIntervalMs / 16.67));
+        const autonomousBlockMoveSpeed = 0.16;
+        const autonomousBlockMoveDirections = 16;
+        const autonomousBlockMoveGapPx = 6;
+        const autonomousBlockMoveWallMarginPx = 10;
         const trailLength = 10;
         const trailHistoryStep = 2;
         const trailNodes = [];
@@ -1158,6 +1165,7 @@
             domino: -Infinity,
             wall: -Infinity
         };
+        let nextAutonomousBlockPlanAt = -Infinity;
 
         function createTrailNodes() {
             for (let i = 0; i < trailLength; i++) {
@@ -1908,6 +1916,156 @@
                 first.y + first.height + gap > second.y;
         }
 
+        function getTranslatedRect(rect, deltaX = 0, deltaY = 0) {
+            return {
+                x: rect.x + deltaX,
+                y: rect.y + deltaY,
+                width: rect.width,
+                height: rect.height
+            };
+        }
+
+        function shuffleInPlace(values) {
+            for (let index = values.length - 1; index > 0; index--) {
+                const swapIndex = Math.floor(Math.random() * (index + 1));
+                [values[index], values[swapIndex]] = [values[swapIndex], values[index]];
+            }
+            return values;
+        }
+
+        function clearAutonomousBlockMotion(resetTimer = true) {
+            for (const domino of dominoes) {
+                domino.autoMoveVx = 0;
+                domino.autoMoveVy = 0;
+            }
+            if (resetTimer) {
+                nextAutonomousBlockPlanAt = -Infinity;
+            }
+        }
+
+        function canUseAutonomousBlockMovement(now = performance.now()) {
+            return isPlaying && !isPaused && !isLevelingUp && level >= autonomousBlockMoveStartLevel && dominoes.length > 0;
+        }
+
+        function getAutonomousBlockCandidateDirections() {
+            const directions = [{ x: 0, y: 0 }];
+            for (let index = 0; index < autonomousBlockMoveDirections; index++) {
+                const angle = (Math.PI * 2 * index) / autonomousBlockMoveDirections;
+                directions.push({
+                    x: Math.cos(angle),
+                    y: Math.sin(angle)
+                });
+            }
+            return shuffleInPlace(directions);
+        }
+
+        function isAutonomousBlockDirectionSafe(domino, baseRect, direction, moveDistance, bounds, currentRects, plannedRects, plannedMidRects) {
+            const deltaX = direction.x * moveDistance;
+            const deltaY = direction.y * moveDistance;
+            const midpointRect = getTranslatedRect(baseRect, deltaX * 0.5, deltaY * 0.5);
+            const endRect = getTranslatedRect(baseRect, deltaX, deltaY);
+            const wallMargin = autonomousBlockMoveWallMarginPx;
+
+            if (
+                endRect.x < bounds.left + wallMargin ||
+                endRect.y < bounds.top + wallMargin ||
+                endRect.x + endRect.width > bounds.right - wallMargin ||
+                endRect.y + endRect.height > bounds.bottom - wallMargin
+            ) {
+                return false;
+            }
+
+            const dominoCenterX = baseRect.x + (baseRect.width / 2);
+            const dominoCenterY = baseRect.y + (baseRect.height / 2);
+            const toBallX = x - dominoCenterX;
+            const toBallY = y - dominoCenterY;
+            const toBallLength = Math.hypot(toBallX, toBallY);
+            if (toBallLength > 0.0001) {
+                const towardBallDot = ((direction.x * toBallX) + (direction.y * toBallY)) / toBallLength;
+                if (towardBallDot > 0.08) {
+                    return false;
+                }
+            }
+
+            for (const otherDomino of dominoes) {
+                if (otherDomino === domino || otherDomino.knocked || !isDominoSolid(otherDomino, performance.now())) continue;
+
+                const otherCurrentRect = currentRects.get(otherDomino);
+                const otherEndRect = plannedRects.get(otherDomino) || otherCurrentRect;
+                const otherMidRect = plannedMidRects.get(otherDomino) || otherCurrentRect;
+
+                if (
+                    rectanglesOverlap(endRect, otherEndRect, autonomousBlockMoveGapPx) ||
+                    rectanglesOverlap(midpointRect, otherMidRect, autonomousBlockMoveGapPx) ||
+                    rectanglesOverlap(endRect, otherCurrentRect, autonomousBlockMoveGapPx)
+                ) {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        function planAutonomousBlockMotion(now = performance.now()) {
+            if (!canUseAutonomousBlockMovement(now)) {
+                clearAutonomousBlockMotion(false);
+                nextAutonomousBlockPlanAt = now + autonomousBlockMoveIntervalMs;
+                return;
+            }
+
+            const bounds = getPlayfieldBounds(now);
+            const moveDistance = autonomousBlockMoveSpeed * autonomousBlockMoveFramesEstimate;
+            const intactDominoes = dominoes.filter(domino => !domino.knocked && isDominoSolid(domino, now));
+            const currentRects = new Map();
+            const plannedRects = new Map();
+            const plannedMidRects = new Map();
+
+            for (const domino of dominoes) {
+                domino.autoMoveVx = 0;
+                domino.autoMoveVy = 0;
+            }
+
+            for (const domino of intactDominoes) {
+                currentRects.set(domino, getDominoHitRect(domino, now));
+            }
+
+            shuffleInPlace(intactDominoes);
+
+            for (const domino of intactDominoes) {
+                const baseRect = currentRects.get(domino);
+                let chosenDirection = { x: 0, y: 0 };
+
+                for (const direction of getAutonomousBlockCandidateDirections()) {
+                    if (direction.x === 0 && direction.y === 0) {
+                        chosenDirection = direction;
+                        break;
+                    }
+                    if (isAutonomousBlockDirectionSafe(domino, baseRect, direction, moveDistance, bounds, currentRects, plannedRects, plannedMidRects)) {
+                        chosenDirection = direction;
+                        break;
+                    }
+                }
+
+                domino.autoMoveVx = chosenDirection.x * autonomousBlockMoveSpeed;
+                domino.autoMoveVy = chosenDirection.y * autonomousBlockMoveSpeed;
+                plannedRects.set(domino, getTranslatedRect(baseRect, domino.autoMoveVx * autonomousBlockMoveFramesEstimate, domino.autoMoveVy * autonomousBlockMoveFramesEstimate));
+                plannedMidRects.set(domino, getTranslatedRect(baseRect, domino.autoMoveVx * autonomousBlockMoveFramesEstimate * 0.5, domino.autoMoveVy * autonomousBlockMoveFramesEstimate * 0.5));
+            }
+
+            nextAutonomousBlockPlanAt = now + autonomousBlockMoveIntervalMs;
+        }
+
+        function updateAutonomousBlockMotion(now = performance.now()) {
+            if (!canUseAutonomousBlockMovement(now)) {
+                clearAutonomousBlockMotion(false);
+                return;
+            }
+
+            if (now >= nextAutonomousBlockPlanAt) {
+                planAutonomousBlockMotion(now);
+            }
+        }
+
         function resetIdleShrinkState(now = performance.now()) {
             levelGrowAnimation = null;
             playfieldScale = 1;
@@ -2236,6 +2394,8 @@
         function markDominoKnocked(domino, now) {
             if (domino.knocked) return;
             domino.knocked = true;
+            domino.autoMoveVx = 0;
+            domino.autoMoveVy = 0;
             domino.knockedAt = now;
             domino.removeAt = now + knockedBlockLifetimeMs;
             domino.element.classList.add('knocked');
@@ -3198,6 +3358,7 @@ function getIntroCopy() {
         function spawnBlocks(targetLevel) {
             dominoContainer.innerHTML = '';
             dominoes = [];
+            nextAutonomousBlockPlanAt = -Infinity;
             dominoCalloutCount = 0;
             lastDominoCalloutAt = -Infinity;
             clearBallCallout(true);
@@ -3291,6 +3452,8 @@ function getIntroCopy() {
                     previousVx: 0,
                     previousVy: 0,
                     recentAcceleration: 0,
+                    autoMoveVx: 0,
+                    autoMoveVy: 0,
                     angle: 0,
                     angularVelocity: 0,
                     hitCount: 0,
@@ -3406,6 +3569,7 @@ function getIntroCopy() {
         }
 
         function beginFall() {
+            clearAutonomousBlockMotion();
             gameOverTransparentBorders.top = false;
             gameOverTransparentBorders.right = false;
             gameOverTransparentBorders.bottom = false;
@@ -3424,6 +3588,7 @@ function getIntroCopy() {
         }
 
         function finishRound() {
+            clearAutonomousBlockMotion();
             const finishNow = performance.now();
             gameOverTransparentBorders.top = false;
             gameOverTransparentBorders.right = false;
@@ -3501,6 +3666,7 @@ function getIntroCopy() {
             }
             if (isPlaying && !isPaused) {
                 updateLevelShrinkCueAudio(now);
+                updateAutonomousBlockMotion(now);
             }
 
             if (isPlaying && !isPaused) {
@@ -3551,8 +3717,11 @@ function getIntroCopy() {
                             : 0;
                         const knockedMotionDamping = domino.knocked ? 1 - (knockProgress * 0.14) : 1;
 
-                        domino.x += domino.vx * knockedMotionDamping;
-                        domino.y += domino.vy * knockedMotionDamping;
+                        const autoMoveVx = domino.knocked ? 0 : (domino.autoMoveVx || 0);
+                        const autoMoveVy = domino.knocked ? 0 : (domino.autoMoveVy || 0);
+
+                        domino.x += (domino.vx * knockedMotionDamping) + autoMoveVx;
+                        domino.y += (domino.vy * knockedMotionDamping) + autoMoveVy;
                         domino.angle += domino.angularVelocity * knockedMotionDamping;
                         domino.vx *= blockFriction * knockedMotionDamping;
                         domino.vy *= blockFriction * knockedMotionDamping;
@@ -3665,6 +3834,7 @@ function getIntroCopy() {
         }
 
         function startGame() {
+            clearAutonomousBlockMotion();
             awaitingStartInput = false;
             clearStartInputTimeout();
             clearPendingLevelAdvance();
