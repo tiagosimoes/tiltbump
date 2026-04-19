@@ -254,10 +254,8 @@
             z-index: 0;
             opacity: 0;
             border-radius: 0;
-            mix-blend-mode: screen;
-            background:
-                radial-gradient(circle at 50% 42%, rgba(255, 255, 255, 0.14) 0%, rgba(255, 255, 255, 0.05) 26%, transparent 62%),
-                linear-gradient(160deg, var(--bg-top) 0%, var(--bg-bottom) 100%);
+            mix-blend-mode: normal;
+            background: var(--bg-top);
             box-shadow:
                 0 0 0 1px rgba(255, 255, 255, 0.04) inset;
             will-change: left, top, width, height, border-radius, opacity, background;
@@ -1317,55 +1315,7 @@
         }
 
         function updatePlayfieldLighting(now = performance.now()) {
-            const tiltX = Number.isFinite(ax) ? ax : 0;
-            const tiltY = Number.isFinite(ay) ? ay : 0;
-            const tiltMagnitude = Math.hypot(tiltX, tiltY);
-            const sourceX = -tiltX * 5.4;
-            const sourceY = -tiltY * 5.4;
-            const targetInputStrength = Math.min(0.65, tiltMagnitude / 1.8);
-            const targetShiftX = Math.max(-0.28, Math.min(0.28, sourceX * 0.024));
-            const targetShiftY = Math.max(-0.24, Math.min(0.24, sourceY * 0.024));
-
-            if (!Number.isFinite(updatePlayfieldLighting.smoothShiftX)) {
-                updatePlayfieldLighting.smoothShiftX = targetShiftX;
-                updatePlayfieldLighting.smoothShiftY = targetShiftY;
-                updatePlayfieldLighting.smoothStrength = targetInputStrength;
-            }
-
-            const smoothing = isPlaying && !isPaused ? 0.36 : 0.26;
-            updatePlayfieldLighting.smoothShiftX += (targetShiftX - updatePlayfieldLighting.smoothShiftX) * smoothing;
-            updatePlayfieldLighting.smoothShiftY += (targetShiftY - updatePlayfieldLighting.smoothShiftY) * smoothing;
-            updatePlayfieldLighting.smoothStrength += (targetInputStrength - updatePlayfieldLighting.smoothStrength) * (smoothing * 0.92);
-
-            const inputStrength = Math.max(0, updatePlayfieldLighting.smoothStrength || 0);
-            const lightShiftX = updatePlayfieldLighting.smoothShiftX || 0;
-            const lightShiftY = updatePlayfieldLighting.smoothShiftY || 0;
-            const lightX = 50 + (lightShiftX * 100);
-            const lightY = 42 + (lightShiftY * 100);
-            const shadowX = 50 - (lightShiftX * 34);
-            const shadowY = 58 - (lightShiftY * 34);
-            const beamCoreAlpha = (0.085 + (inputStrength * 0.065)).toFixed(3);
-            const beamGlowAlpha = (0.045 + (inputStrength * 0.034)).toFixed(3);
-            const beamTailAlpha = (0.020 + (inputStrength * 0.018)).toFixed(3);
-            const hotspotAlpha = (0.030 + (inputStrength * 0.020)).toFixed(3);
-            const hotspotGlowAlpha = (0.020 + (inputStrength * 0.014)).toFixed(3);
-            const ambientAlpha = (0.020 + (inputStrength * 0.012)).toFixed(3);
-            const shadowColor = 'rgba(0, 0, 0, 0.08)';
-            const beamWidth = 72 + (inputStrength * 16);
-            const beamHeight = 56 + (inputStrength * 12);
-            const beamGlowStop = 26 + (inputStrength * 5);
-            const beamTailStop = 58 + (inputStrength * 9);
-            const beamFadeStop = 92 + (inputStrength * 6);
-            const hotspotStop = 8 + (inputStrength * 2);
-            const hotspotFadeStop = 24 + (inputStrength * 4);
-
-            playfieldTint.style.background = `
-                radial-gradient(ellipse ${beamWidth.toFixed(2)}% ${beamHeight.toFixed(2)}% at ${lightX.toFixed(2)}% ${lightY.toFixed(2)}%, rgba(255, 255, 255, ${beamCoreAlpha}) 0%, rgba(255, 255, 255, ${beamGlowAlpha}) ${beamGlowStop.toFixed(2)}%, rgba(255, 255, 255, ${beamTailAlpha}) ${beamTailStop.toFixed(2)}%, rgba(255, 255, 255, 0) ${beamFadeStop.toFixed(2)}%),
-                radial-gradient(circle at ${lightX.toFixed(2)}% ${lightY.toFixed(2)}%, rgba(255, 255, 255, ${hotspotAlpha}) 0%, rgba(255, 255, 255, ${hotspotGlowAlpha}) ${hotspotStop.toFixed(2)}%, rgba(255, 255, 255, 0) ${hotspotFadeStop.toFixed(2)}%),
-                radial-gradient(circle at 50% 50%, rgba(255, 255, 255, ${ambientAlpha}) 0%, rgba(255, 255, 255, 0) 72%),
-                radial-gradient(circle at ${shadowX.toFixed(2)}% ${shadowY.toFixed(2)}%, ${shadowColor} 0%, rgba(0, 0, 0, 0.035) 40%, transparent 84%),
-                linear-gradient(160deg, ${currentTheme.bgTop} 0%, ${currentTheme.bgBottom} 100%)
-            `;
+            playfieldTint.style.background = `linear-gradient(160deg, ${currentTheme.bgTop} 0%, ${currentTheme.bgBottom} 100%)`;
         }
 
         function applyThemeForLevel(value) {
