@@ -1193,8 +1193,8 @@
         }
 
         function positionBallAtCenter() {
-            x = safeInsets.left + (viewportWidth / 2);
-            y = safeInsets.top + (viewportHeight / 2);
+            x = safeInsets.left + ((viewportWidth - safeInsets.left - safeInsets.right) / 2);
+            y = safeInsets.top + ((viewportHeight - safeInsets.top - safeInsets.bottom) / 2);
             ballScale = 1;
             ball.style.opacity = '1';
             ball.style.transform = `translate(${x - radius}px, ${y - radius}px) scale(${getBallVisualScale().toFixed(3)})`;
@@ -1205,8 +1205,8 @@
             const overlayScale = getPlayfieldScale(now);
             const isDesktopPointer = shouldUseKeyboardPrompt();
             const isStandaloneMobile = !isDesktopPointer && isStandaloneDisplayMode();
-            const centerX = safeInsets.left + (viewportWidth / 2);
-            const centerY = safeInsets.top + (viewportHeight / 2);
+            const centerX = safeInsets.left + ((viewportWidth - safeInsets.left - safeInsets.right) / 2);
+            const centerY = safeInsets.top + ((viewportHeight - safeInsets.top - safeInsets.bottom) / 2);
             const introBaseTop = safeInsets.top + (viewportHeight * 0.30);
             const levelBaseY = safeInsets.top + (viewportHeight * 0.52);
             const bestBaseTop = safeInsets.top + (viewportHeight * (
@@ -1737,11 +1737,11 @@
             const viewport = window.visualViewport;
             viewportWidth = Math.max(window.innerWidth, viewport ? viewport.width : 0);
             viewportHeight = Math.max(window.innerHeight, viewport ? viewport.height : 0);
-            width = viewportWidth + safeInsets.left + safeInsets.right;
-            height = viewportHeight + safeInsets.top + safeInsets.bottom;
+            width = viewportWidth;
+            height = viewportHeight;
 
-            gameArea.style.left = `${-safeInsets.left}px`;
-            gameArea.style.top = `${-safeInsets.top}px`;
+            gameArea.style.left = '0px';
+            gameArea.style.top = '0px';
             gameArea.style.width = `${width}px`;
             gameArea.style.height = `${height}px`;
 
@@ -1762,8 +1762,9 @@
             const playfieldScale = getPlayfieldScale(now);
             const baseLeft = Math.max(safeInsets.left, minimumPlayfieldInsetPx);
             const baseRight = width - Math.max(safeInsets.right, minimumPlayfieldInsetPx);
-            const baseTop = Math.max(safeInsets.top, minimumPlayfieldInsetPx);
-            const baseBottom = height - Math.max(safeInsets.bottom, minimumPlayfieldInsetPx);
+            let baseTop = Math.max(safeInsets.top, minimumPlayfieldInsetPx);
+            let baseBottom = height - Math.max(safeInsets.bottom, minimumPlayfieldInsetPx);
+
             const insetX = ((baseRight - baseLeft) * (1 - playfieldScale)) / 2;
             const insetY = ((baseBottom - baseTop) * (1 - playfieldScale)) / 2;
             return {
@@ -3861,8 +3862,8 @@ function getIntroCopy() {
             currentRunStartLevel = previewLevel;
             currentRunIsPreview = previewLevel > 1;
             level = currentRunStartLevel;
-            x = safeInsets.left + (viewportWidth / 2);
-            y = safeInsets.top + (viewportHeight / 2);
+            x = safeInsets.left + ((viewportWidth - safeInsets.left - safeInsets.right) / 2);
+            y = safeInsets.top + ((viewportHeight - safeInsets.top - safeInsets.bottom) / 2);
             vx = 0;
             vy = 0;
             ballScale = 1;
