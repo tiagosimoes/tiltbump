@@ -539,7 +539,7 @@
             text-align: center;
             font-size: 20px;
             color: var(--hud-color);
-            line-height: 1.25;
+            line-height: 1.16;
             font-weight: inherit;
             pointer-events: none;
             z-index: 1000;
@@ -547,7 +547,7 @@
         }
 
         #achievementSummary .achievement-line {
-            margin-top: 2px;
+            margin-top: 1px;
         }
 
         #achievementSummary .achievement-line:first-child {
@@ -1194,7 +1194,6 @@
         let achievementBestRecords = loadAchievementBestRecords();
         let achievementRecordHighlights = {
             wallKnocks: false,
-            doubleHits: false,
             dominos: false,
             doubleDominos: false,
             combos: false
@@ -1243,7 +1242,7 @@
         let lastDominoCalloutAt = -Infinity;
         let desktopQrVisible = false;
         let wallKnockCalloutTotal = 0;
-        let doubleHitCalloutTotal = 0;
+        let hitTierCalloutTotals = {};
         let dominoCalloutTotal = 0;
         let doubleDominoCalloutTotal = 0;
         let comboCalloutTotal = 0;
@@ -1374,7 +1373,7 @@
             achievementSummary.style.left = `${centerX}px`;
             achievementSummary.style.setProperty('--overlay-text-scale', overlayScale.toFixed(3));
             if (isShowingGameOver && achievementSummary.style.display !== 'none') {
-                const achievementBaseTop = safeInsets.top + (viewportHeight * (viewportHeight <= 500 ? 0.60 : 0.61));
+                const achievementBaseTop = safeInsets.top + (viewportHeight * (viewportHeight <= 500 ? 0.615 : 0.625));
                 achievementSummary.style.top = `${centerY + ((achievementBaseTop - centerY) * overlayScale)}px`;
             }
 
@@ -1382,7 +1381,7 @@
             restartText.style.setProperty('--overlay-text-scale', overlayScale.toFixed(3));
             if (isShowingGameOver && achievementSummary.style.display !== 'none') {
                 const achievementRect = achievementSummary.getBoundingClientRect();
-                const restartTop = achievementRect.bottom + 2;
+                const restartTop = achievementRect.bottom + 10;
                 restartText.style.top = `${restartTop}px`;
             } else {
                 restartText.style.top = `${centerY + ((restartBaseTop - centerY) * overlayScale)}px`;
@@ -1603,34 +1602,50 @@
             }
         }
 
+        function normalizeHitTierTotals(source) {
+            const normalized = {};
+            if (!source || typeof source !== 'object') {
+                return normalized;
+            }
+
+            for (const [rawTier, rawCount] of Object.entries(source)) {
+                const tier = Number(rawTier);
+                const count = Number(rawCount);
+                if (!Number.isFinite(tier) || tier < 2 || !Number.isFinite(count) || count <= 0) continue;
+                normalized[String(Math.round(tier))] = Math.max(0, Math.round(count));
+            }
+
+            return normalized;
+        }
+
         function loadAchievementBestRecords() {
             try {
                 const raw = localStorage.getItem('tiltbump-achievement-best-records');
                 if (!raw) {
                     return {
                         wallKnocks: 0,
-                        doubleHits: 0,
+                        hitTierTotals: {},
                         dominos: 0,
                         doubleDominos: 0,
-                combos: 0
+                        combos: 0
                     };
                 }
 
                 const parsed = JSON.parse(raw);
                 return {
                     wallKnocks: Number.isFinite(parsed?.wallKnocks) ? parsed.wallKnocks : 0,
-                    doubleHits: Number.isFinite(parsed?.doubleHits) ? parsed.doubleHits : 0,
+                    hitTierTotals: normalizeHitTierTotals(parsed?.hitTierTotals),
                     dominos: Number.isFinite(parsed?.dominos) ? parsed.dominos : 0,
                     doubleDominos: Number.isFinite(parsed?.doubleDominos) ? parsed.doubleDominos : 0,
-            combos: Number.isFinite(parsed?.combos) ? parsed.combos : 0
+                    combos: Number.isFinite(parsed?.combos) ? parsed.combos : 0
                 };
             } catch {
                 return {
                     wallKnocks: 0,
-                    doubleHits: 0,
+                    hitTierTotals: {},
                     dominos: 0,
                     doubleDominos: 0,
-                combos: 0
+                    combos: 0
                 };
             }
         }
@@ -1645,7 +1660,7 @@
 
         function resetRunAchievementTotals() {
             wallKnockCalloutTotal = 0;
-            doubleHitCalloutTotal = 0;
+            hitTierCalloutTotals = {};
             dominoCalloutTotal = 0;
             doubleDominoCalloutTotal = 0;
             comboCalloutTotal = 0;
@@ -1656,7 +1671,6 @@
             };
             achievementRecordHighlights = {
                 wallKnocks: false,
-                doubleHits: false,
                 dominos: false,
                 doubleDominos: false,
                 combos: false
@@ -1667,6 +1681,43 @@
             return count === 1 ? singular : plural;
         }
 
+        function getHitTierAchievementKey(hitTier) {
+            return `hitTier_${hitTier}`;
+        }
+
+        function getHitTierAchievementBaseLabel(hitTier) {
+            switch (hitTier) {
+                case 2:
+                    return 'double hit';
+                case 3:
+                    return 'triple hit';
+                case 4:
+                    return 'quadruple hit';
+                case 5:
+                    return 'quintuple hit';
+                case 6:
+                    return 'sextuple hit';
+                default:
+                    return `${hitTier}x hit`;
+            }
+        }
+
+        function getHitTierAchievementLines() {
+            return Object.keys(hitTierCalloutTotals)
+                .map(rawTier => Number(rawTier))
+                .filter(hitTier => Number.isFinite(hitTier) && hitTier >= 2 && hitTierCalloutTotals[String(hitTier)] > 0)
+                .sort((first, second) => first - second)
+                .map(hitTier => {
+                    const count = hitTierCalloutTotals[String(hitTier)];
+                    const baseLabel = getHitTierAchievementBaseLabel(hitTier);
+                    return {
+                        key: getHitTierAchievementKey(hitTier),
+                        count,
+                        label: `${count} ${pluralizeAchievementLabel(count, baseLabel, `${baseLabel}s`)}!`
+                    };
+                });
+        }
+
         function getAchievementSummaryLines() {
             return [
                 {
@@ -1674,11 +1725,7 @@
                     count: wallKnockCalloutTotal,
                     label: `${wallKnockCalloutTotal} ${pluralizeAchievementLabel(wallKnockCalloutTotal, 'wall knock', 'wall knocks')}!`
                 },
-                {
-                    key: 'doubleHits',
-                    count: doubleHitCalloutTotal,
-                    label: `${doubleHitCalloutTotal} ${pluralizeAchievementLabel(doubleHitCalloutTotal, 'double hit', 'double hits')}!`
-                },
+                ...getHitTierAchievementLines(),
                 {
                     key: 'dominos',
                     count: dominoCalloutTotal,
@@ -1700,11 +1747,17 @@
         function captureAchievementRecordHighlights() {
             achievementRecordHighlights = {
                 wallKnocks: wallKnockCalloutTotal > (achievementBestRecords.wallKnocks || 0),
-                doubleHits: doubleHitCalloutTotal > (achievementBestRecords.doubleHits || 0),
                 dominos: dominoCalloutTotal > (achievementBestRecords.dominos || 0),
                 doubleDominos: doubleDominoCalloutTotal > (achievementBestRecords.doubleDominos || 0),
                 combos: comboCalloutTotal > (achievementBestRecords.combos || 0)
             };
+
+            const recordTierTotals = normalizeHitTierTotals(achievementBestRecords.hitTierTotals);
+            for (const [rawTier, count] of Object.entries(hitTierCalloutTotals)) {
+                const hitTier = String(Math.round(Number(rawTier)));
+                const highlightKey = getHitTierAchievementKey(Number(hitTier));
+                achievementRecordHighlights[highlightKey] = count > (recordTierTotals[hitTier] || 0);
+            }
         }
 
         function updateAchievementSummaryState() {
@@ -1725,10 +1778,17 @@
                 achievementBestRecords.wallKnocks = wallKnockCalloutTotal;
                 changed = true;
             }
-            if (doubleHitCalloutTotal > achievementBestRecords.doubleHits) {
-                achievementBestRecords.doubleHits = doubleHitCalloutTotal;
-                changed = true;
+
+            const recordTierTotals = normalizeHitTierTotals(achievementBestRecords.hitTierTotals);
+            for (const [rawTier, count] of Object.entries(hitTierCalloutTotals)) {
+                const hitTier = String(Math.round(Number(rawTier)));
+                if (count > (recordTierTotals[hitTier] || 0)) {
+                    recordTierTotals[hitTier] = count;
+                    changed = true;
+                }
             }
+            achievementBestRecords.hitTierTotals = recordTierTotals;
+
             if (dominoCalloutTotal > achievementBestRecords.dominos) {
                 achievementBestRecords.dominos = dominoCalloutTotal;
                 changed = true;
@@ -2992,9 +3052,8 @@
             domino.lastHitAt = now;
             domino.hitCount = (domino.hitCount || 0) + 1;
             if (domino.hitCount >= 2) {
-                if (domino.hitCount === 2) {
-                    doubleHitCalloutTotal++;
-                }
+                const hitTierKey = String(domino.hitCount);
+                hitTierCalloutTotals[hitTierKey] = (hitTierCalloutTotals[hitTierKey] || 0) + 1;
                 showBallCallout(`${getMultiplierWord(domino.hitCount)} hit!`, now, 820);
             }
         }
