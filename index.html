@@ -703,52 +703,7 @@
             color: rgba(255, 255, 255, 0.98);
             outline: none;
         }
-
-        #mobileShareWrap {
-            position: absolute;
-            left: 50%;
-            transform: translateX(-50%) scale(var(--overlay-text-scale, 1));
-            transform-origin: center top;
-            width: calc(100vw - 32px);
-            max-width: 560px;
-            padding: 0 calc(16px + var(--safe-right)) 0 calc(16px + var(--safe-left));
-            box-sizing: border-box;
-            font-size: 20px;
-            color: var(--hud-color);
-            text-align: center;
-            pointer-events: none;
-            line-height: 1.3;
-            font-weight: inherit;
-            z-index: 1001;
-            display: none;
-        }
-
-        #mobileShareText {
-            margin-bottom: 6px;
-            color: rgba(208, 220, 236, 0.58);
-            font-size: 18px;
-            line-height: 1.2;
-        }
-
-        #mobileShareLink {
-            pointer-events: auto;
-            color: rgba(232, 240, 255, 0.92);
-            font: inherit;
-            font-size: 20px;
-            font-weight: 300;
-            line-height: 1.2;
-            text-decoration: underline;
-            text-underline-offset: 0.18em;
-            cursor: pointer;
-        }
-
-        #mobileShareLink:hover,
-        #mobileShareLink:focus-visible {
-            color: rgba(255, 255, 255, 0.98);
-            outline: none;
-        }
-
-        #desktopQrPanel {
+#desktopQrPanel {
             top: calc(50% + 31vh);
             top: calc(50% + 31dvh);
             z-index: 1002;
@@ -958,11 +913,7 @@
         <div id="mobileVersionLinkText">or</div>
         <a id="mobileVersionLink" href="#">try the mobile version</a>
     </div>
-    <div id="mobileShareWrap">
-        <div id="mobileShareText">or</div>
-        <a id="mobileShareLink" href="#">share</a>
-    </div>
-    <button id="muteToggle" class="hudIconButton" type="button" aria-pressed="false" aria-label="Mute sound" title="Mute sound">
+<button id="muteToggle" class="hudIconButton" type="button" aria-pressed="false" aria-label="Mute sound" title="Mute sound">
         <svg class="icon-on" viewBox="0 0 24 24" aria-hidden="true">
             <path d="M5 10h4l5-4v12l-5-4H5z"></path>
             <path d="M18 9a4.5 4.5 0 0 1 0 6"></path>
@@ -990,8 +941,6 @@
         const bestScoreDisplay = document.getElementById('bestScoreDisplay');
         const mobileVersionLinkWrap = document.getElementById('mobileVersionLinkWrap');
         const mobileVersionLink = document.getElementById('mobileVersionLink');
-        const mobileShareWrap = document.getElementById('mobileShareWrap');
-        const mobileShareLink = document.getElementById('mobileShareLink');
         const desktopQrPanel = document.getElementById('desktopQrPanel');
         const desktopQrCard = document.getElementById('desktopQrCard');
         const desktopQrImage = document.getElementById('desktopQrImage');
@@ -1455,15 +1404,6 @@
                 mobileVersionLinkWrap.style.top = `${restartRect.bottom + 8}px`;
             } else {
                 mobileVersionLinkWrap.style.top = `${centerY + ((linkBaseTop - centerY) * overlayScale)}px`;
-            }
-
-            mobileShareWrap.style.left = `${centerX}px`;
-            mobileShareWrap.style.setProperty('--overlay-text-scale', overlayScale.toFixed(3));
-            if (shouldShowMobileShareCta()) {
-                const restartRect = restartText.getBoundingClientRect();
-                mobileShareWrap.style.top = `${restartRect.bottom + (achievementSummary.style.display !== 'none' ? 12 : 8)}px`;
-            } else {
-                mobileShareWrap.style.top = `${centerY + ((linkBaseTop - centerY) * overlayScale)}px`;
             }
 
             desktopQrPanel.style.left = `${centerX}px`;
@@ -2011,177 +1951,6 @@
             mobileVersionLinkWrap.style.display = shouldShowDesktopMobileCta ? 'block' : 'none';
             setDesktopQrVisible(shouldShowDesktopMobileCta && desktopQrVisible);
         }
-
-        function shouldShowMobileShareCta() {
-            return !shouldUseKeyboardPrompt() && isShowingGameOver;
-        }
-
-        function syncMobileShareVisibility() {
-            mobileShareWrap.style.display = shouldShowMobileShareCta() ? 'block' : 'none';
-        }
-
-        async function capturePageScreenshotBlob() {
-            if (!window.html2canvas) {
-                await new Promise((resolve, reject) => {
-                    const script = document.createElement('script');
-                    script.src = 'https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js';
-                    script.onload = resolve;
-                    script.onerror = reject;
-                    document.head.appendChild(script);
-                });
-            }
-
-            const screenshotStyleTargets = [
-                [playfieldTint, 'opacity'],
-                [playfieldBorder, 'opacity'],
-                [edgeThreatOverlay, 'opacity'],
-                [edgeGlow, 'opacity'],
-                [outsideGlow, 'opacity']
-            ];
-            const previousStyles = screenshotStyleTargets.map(([element, property]) => [element, property, element.style[property]]);
-            const previousHtmlBackground = document.documentElement.style.background;
-            const previousBodyBackground = document.body.style.background;
-            const previousBodyBackgroundColor = document.body.style.backgroundColor;
-            const previousGameAreaBackground = gameArea.style.background;
-
-            const addRoundedRectPath = (ctx, x, y, width, height, radius) => {
-                const r = Math.max(0, Math.min(radius, Math.min(width, height) / 2));
-                ctx.beginPath();
-                ctx.moveTo(x + r, y);
-                ctx.lineTo(x + width - r, y);
-                ctx.arcTo(x + width, y, x + width, y + r, r);
-                ctx.lineTo(x + width, y + height - r);
-                ctx.arcTo(x + width, y + height, x + width - r, y + height, r);
-                ctx.lineTo(x + r, y + height);
-                ctx.arcTo(x, y + height, x, y + height - r, r);
-                ctx.lineTo(x, y + r);
-                ctx.arcTo(x, y, x + r, y, r);
-                ctx.closePath();
-            };
-
-            try {
-                playfieldTint.style.opacity = '0';
-                playfieldBorder.style.opacity = '0';
-                edgeThreatOverlay.style.opacity = '0';
-                edgeGlow.style.opacity = '0';
-                outsideGlow.style.opacity = '0';
-
-                document.documentElement.style.background = 'transparent';
-                document.body.style.background = 'transparent';
-                document.body.style.backgroundColor = 'transparent';
-                gameArea.style.background = 'transparent';
-
-                const renderedCanvas = await window.html2canvas(document.body, {
-                    backgroundColor: null,
-                    useCORS: true,
-                    scale: Math.min(window.devicePixelRatio || 1, 2)
-                });
-
-                const bounds = getPlayfieldBounds();
-                const frameWidth = Math.max(0, bounds.right - bounds.left);
-                const frameHeight = Math.max(0, bounds.bottom - bounds.top);
-                const cornerRadius = getPlayfieldCornerRadius(frameWidth, frameHeight);
-
-                const outputCanvas = document.createElement('canvas');
-                outputCanvas.width = renderedCanvas.width;
-                outputCanvas.height = renderedCanvas.height;
-                const ctx = outputCanvas.getContext('2d');
-
-                const scaleX = renderedCanvas.width / Math.max(1, width);
-                const scaleY = renderedCanvas.height / Math.max(1, height);
-                const left = bounds.left * scaleX;
-                const top = bounds.top * scaleY;
-                const scaledWidth = frameWidth * scaleX;
-                const scaledHeight = frameHeight * scaleY;
-                const scaledRadius = cornerRadius * Math.min(scaleX, scaleY);
-
-                ctx.clearRect(0, 0, outputCanvas.width, outputCanvas.height);
-
-                ctx.save();
-                addRoundedRectPath(ctx, left, top, scaledWidth, scaledHeight, scaledRadius);
-                ctx.clip();
-                ctx.fillStyle = currentTheme.bgTop;
-                ctx.fillRect(left, top, scaledWidth, scaledHeight);
-                ctx.drawImage(renderedCanvas, 0, 0);
-                ctx.restore();
-
-                const borderColor = getComputedStyle(playfieldBorder).borderTopColor || 'rgba(241, 196, 15, 0.82)';
-                const borderWidthCss = parseFloat(getComputedStyle(playfieldBorder).borderTopWidth) || 4;
-                const borderWidth = borderWidthCss * Math.min(scaleX, scaleY);
-
-                if (borderWidth > 0) {
-                    ctx.save();
-                    ctx.strokeStyle = borderColor;
-                    ctx.lineWidth = borderWidth;
-                    addRoundedRectPath(
-                        ctx,
-                        left + borderWidth / 2,
-                        top + borderWidth / 2,
-                        Math.max(0, scaledWidth - borderWidth),
-                        Math.max(0, scaledHeight - borderWidth),
-                        Math.max(0, scaledRadius - borderWidth / 2)
-                    );
-                    ctx.stroke();
-                    ctx.restore();
-                }
-
-                return await new Promise(resolve => outputCanvas.toBlob(resolve, 'image/png'));
-            } finally {
-                for (const [element, property, value] of previousStyles) {
-                    element.style[property] = value;
-                }
-                document.documentElement.style.background = previousHtmlBackground;
-                document.body.style.background = previousBodyBackground;
-                document.body.style.backgroundColor = previousBodyBackgroundColor;
-                gameArea.style.background = previousGameAreaBackground;
-            }
-        }
-
-        async function handleMobileShare(event) {
-            event.preventDefault();
-            event.stopPropagation();
-
-            const shareText = `I scored ${level} on https://tiagosimoes.github.io/tiltbump/. Bet you can't beat that.`;
-            const previousDisplay = mobileShareWrap.style.display;
-
-            try {
-                mobileShareWrap.style.display = 'none';
-                await new Promise(resolve => setTimeout(resolve, 500));
-
-                const blob = await capturePageScreenshotBlob();
-                const file = blob ? new File([blob], 'tiltbump-score.png', { type: 'image/png' }) : null;
-
-                mobileShareWrap.style.display = previousDisplay || 'block';
-
-                if (navigator.share) {
-                    if (file && navigator.canShare && navigator.canShare({ files: [file] })) {
-                        await navigator.share({
-                            text: shareText,
-                            files: [file]
-                        });
-                        return;
-                    }
-
-                    await navigator.share({
-                        text: shareText
-                    });
-                    return;
-                }
-            } catch (error) {
-                mobileShareWrap.style.display = previousDisplay || 'block';
-                console.error('Share failed', error);
-            }
-
-            try {
-                await navigator.clipboard.writeText(shareText);
-                showBallCallout('share text copied', performance.now(), 900);
-            } catch (error) {
-                console.error('Clipboard fallback failed', error);
-            } finally {
-                mobileShareWrap.style.display = previousDisplay || 'block';
-            }
-        }
-
         function updateViewportBounds() {
             const probeStyles = getComputedStyle(safeAreaProbe);
             safeInsets = {
@@ -2838,7 +2607,6 @@
             updateAchievementSummaryState();
             updateTitleLogoState();
             updateOverlayTextLayout();
-            syncMobileShareVisibility();
         }
 
         function clearPendingLevelAdvance() {
@@ -3598,7 +3366,6 @@
 
             return text;
         }
-
 
 function getIntroCopy() {
             return shouldUseKeyboardPrompt()
@@ -4473,7 +4240,6 @@ function getIntroCopy() {
         applyPauseState();
         applyMuteState();
         syncDesktopStartUiVisibility();
-        syncMobileShareVisibility();
         armStartInput();
 
         gameArea.addEventListener('pointerdown', handlePointerControlStart);
@@ -4496,9 +4262,6 @@ function getIntroCopy() {
             event.stopPropagation();
             setDesktopQrVisible(!desktopQrVisible);
         });
-        mobileShareLink.addEventListener('pointerdown', event => event.stopPropagation());
-        mobileShareLink.addEventListener('touchend', event => event.stopPropagation());
-        mobileShareLink.addEventListener('click', handleMobileShare);
         desktopQrCard.addEventListener('pointerdown', event => event.stopPropagation());
         desktopQrCard.addEventListener('touchend', event => event.stopPropagation());
         desktopQrCard.addEventListener('click', event => event.stopPropagation());
